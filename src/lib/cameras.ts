@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { cameraApi, type Camera } from "@/lib/api";
 
 export type CameraProtocol = "HTTP" | "RTSP";
 
@@ -8,6 +9,7 @@ export type SavedCamera = {
   location: string;
   url: string;
   protocol: CameraProtocol;
+  status?: "online" | "offline";
 };
 
 const STORAGE_KEY = "rumi-cameras";
@@ -26,59 +28,107 @@ export function normalizeCameraUrl(url: string) {
   }
 }
 
-function readCameras(): SavedCamera[] {
-  if (typeof window === "undefined") return [];
+export function getCameraProtocol(url: string): CameraProtocol {
+  if (/^rtsp:\/\//i.test(url)) return "RTSP";
+  return "HTTP";
+}
 
+function readCachedCameras(): SavedCamera[] {
+  if (typeof window === "undefined") return [];
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
-    const cameras = value ? (JSON.parse(value) as SavedCamera[]) : [];
-    return cameras.map((camera) => ({
-      ...camera,
-      url: normalizeCameraUrl(camera.url),
-    }));
+    return value ? (JSON.parse(value) as SavedCamera[]) : [];
   } catch {
     return [];
   }
 }
 
-function writeCameras(cameras: SavedCamera[]) {
+function writeCachedCameras(cameras: SavedCamera[]) {
+  if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cameras));
   window.dispatchEvent(new Event(CAMERAS_CHANGED_EVENT));
 }
 
-export function getCameraProtocol(url: string): CameraProtocol | null {
-  if (/^rtsp:\/\//i.test(url)) return "RTSP";
-  if (/^https?:\/\//i.test(url)) return "HTTP";
-  return null;
+export async function fetchCameras(): Promise<SavedCamera[]> {
+  try {
+    const remoteCameras = await cameraApi.list();
+    const formatted: SavedCamera[] = remoteCameras.map((c) => ({
+      id: c.id,
+      name: c.name,
+      location: c.location,
+      url: normalizeCameraUrl(c.url),
+      protocol: c.protocol,
+      status: c.status,
+    }));
+    writeCachedCameras(formatted);
+    return formatted;
+  } catch (err) {
+    console.warn("Using cached cameras due to fetch error:", err);
+    return readCachedCameras();
+  }
 }
 
-export function addCamera(camera: Omit<SavedCamera, "id" | "protocol">) {
+export async function addCamera(camera: { name: string; location: string; url: string }) {
   const normalizedUrl = normalizeCameraUrl(camera.url);
-  const protocol = getCameraProtocol(normalizedUrl);
-  if (!protocol) throw new Error("URL harus diawali http://, https://, atau rtsp://");
-
-  const savedCamera: SavedCamera = {
-    ...camera,
-    url: normalizedUrl,
-    id: crypto.randomUUID(),
-    protocol,
-  };
-  writeCameras([...readCameras(), savedCamera]);
-  return savedCamera;
+  try {
+    const created = await cameraApi.create({
+      name: camera.name,
+      location: camera.location,
+      url: normalizedUrl,
+    });
+    const current = readCachedCameras();
+    const updated = [
+      ...current,
+      {
+        id: created.id,
+        name: created.name,
+        location: created.location,
+        url: normalizeCameraUrl(created.url),
+        protocol: created.protocol,
+        status: created.status,
+      },
+    ];
+    writeCachedCameras(updated);
+    return created;
+  } catch (err) {
+    // Fallback locally
+    const protocol = getCameraProtocol(normalizedUrl);
+    const localCamera: SavedCamera = {
+      id: crypto.randomUUID(),
+      name: camera.name,
+      location: camera.location,
+      url: normalizedUrl,
+      protocol,
+      status: "online",
+    };
+    writeCachedCameras([...readCachedCameras(), localCamera]);
+    return localCamera;
+  }
 }
 
-export function removeCamera(id: string) {
-  writeCameras(readCameras().filter((camera) => camera.id !== id));
+export async function removeCamera(id: string) {
+  try {
+    await cameraApi.delete(id);
+  } catch (err) {
+    console.warn("Could not delete camera on backend, removing locally:", err);
+  }
+  const current = readCachedCameras();
+  writeCachedCameras(current.filter((c) => c.id !== id));
 }
 
 export function useSavedCameras() {
-  const [cameras, setCameras] = useState<SavedCamera[]>([]);
+  const [cameras, setCameras] = useState<SavedCamera[]>(() => readCachedCameras());
 
   useEffect(() => {
-    const sync = () => setCameras(readCameras());
-    sync();
+    // Initial fetch from backend
+    void fetchCameras().then((res) => {
+      if (res.length > 0) setCameras(res);
+    });
+
+    const sync = () => setCameras(readCachedCameras());
     window.addEventListener(CAMERAS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
+
     return () => {
       window.removeEventListener(CAMERAS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);

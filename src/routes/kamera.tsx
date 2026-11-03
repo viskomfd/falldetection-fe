@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Cctv, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { Cctv, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-import feedBedroom from "@/assets/feed-bedroom.jpg";
-import feedKitchen from "@/assets/feed-kitchen.jpg";
-import feedLivingRoom from "@/assets/feed-living-room.jpg";
 import { AppShell } from "@/components/app-shell";
 import { CameraFullscreenButton } from "@/components/camera-fullscreen-button";
 import { CameraStream } from "@/components/camera-stream";
@@ -44,46 +41,44 @@ export const Route = createFileRoute("/kamera")({
   component: KameraPage,
 });
 
-const CAMERAS = [
-  {
-    name: "Ruang Tamu",
-    cam: "Cam 01",
-    location: "Ruang Tamu",
-    url: "rtsp://admin:••••••@192.168.1.50:554/stream1",
-    protocol: "RTSP",
-    status: "online",
-    image: feedLivingRoom,
-  },
-  {
-    name: "Garasi",
-    cam: "Cam 04",
-    location: "Garasi",
-    url: "rtsp://admin:••••••@192.168.1.53:554/stream1",
-    protocol: "RTSP",
-    status: "offline",
-    image: null,
-  },
-] as const;
-
 function KameraPage() {
   const savedCameras = useSavedCameras();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") ?? "").trim();
     const location = String(form.get("location") ?? "").trim();
     const url = String(form.get("url") ?? "").trim();
 
+    if (!name || !location || !url) {
+      setFormError("Semua kolom harus diisi.");
+      return;
+    }
+
     try {
-      addCamera({ name, location, url });
+      setIsSubmitting(true);
       setFormError("");
+      await addCamera({ name, location, url });
       setDialogOpen(false);
       event.currentTarget.reset();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Kamera gagal ditambahkan");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      setDeletingId(id);
+      await removeCamera(id);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -156,8 +151,9 @@ function KameraPage() {
                 </div>
                 {formError && <p className="text-sm font-semibold text-destructive">{formError}</p>}
                 <DialogFooter>
-                  <Button type="submit" className="rounded-full">
-                    Tambahkan Kamera
+                  <Button type="submit" className="rounded-full" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                    {isSubmitting ? "Menyimpan..." : "Tambahkan Kamera"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -165,109 +161,77 @@ function KameraPage() {
           </Dialog>
         </div>
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {savedCameras.map((camera, index) => (
-            <article key={camera.id} className="card-shadow overflow-hidden rounded-3xl bg-card">
-              <div data-camera-frame className="relative overflow-hidden bg-muted">
-                <CameraStream
-                  name={camera.name}
-                  url={camera.url}
-                  protocol={camera.protocol}
-                />
-                <span className="camera-live-only absolute left-3 top-3">
-                  <Badge className="rounded-full bg-primary">{camera.protocol}</Badge>
-                </span>
-                <span className="camera-offline-only absolute left-3 top-3">
-                  <Badge className="rounded-full bg-destructive">Offline</Badge>
-                </span>
-                <CameraFullscreenButton cameraName={camera.name} />
-              </div>
-              <div className="flex flex-col gap-3 p-5">
-                <div>
-                  <h3 className="font-bold text-foreground">{camera.name}</h3>
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="size-3.5" />
-                    {camera.location} · Cam {String(CAMERAS.length + index + 1).padStart(2, "0")}
-                  </p>
-                </div>
-                <p className="truncate rounded-xl bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {camera.url}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="self-end rounded-full bg-card text-destructive"
-                  onClick={() => removeCamera(camera.id)}
-                >
-                  <Trash2 className="size-4" />
-                  Hapus
-                </Button>
-              </div>
-            </article>
-          ))}
-          {CAMERAS.map((camera) => (
-            <article key={camera.cam} className="card-shadow overflow-hidden rounded-3xl bg-card">
-              <div data-camera-frame className="relative overflow-hidden bg-muted">
-                {camera.image ? (
-                  <img
-                    src={camera.image}
-                    alt={`Feed kamera ${camera.name}`}
-                    width={1280}
-                    height={720}
-                    loading="lazy"
-                    className="camera-media aspect-video w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-muted">
-                    <Cctv className="size-8 text-muted-foreground/60" />
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      Menyambung ulang…
+        {savedCameras.length === 0 ? (
+          <div className="card-shadow flex flex-col items-center justify-center rounded-3xl bg-card p-12 text-center">
+            <Cctv className="size-12 text-muted-foreground/50" />
+            <h3 className="mt-4 font-bold text-foreground">Belum ada kamera terdaftar</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Klik tombol &quot;Tambah Kamera&quot; di atas untuk menghubungkan stream CCTV atau IP Webcam.
+            </p>
+          </div>
+        ) : (
+          <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {savedCameras.map((camera, index) => {
+              const isOffline = camera.status === "offline";
+              return (
+                <article key={camera.id} className="card-shadow overflow-hidden rounded-3xl bg-card">
+                  <div data-camera-frame className="relative overflow-hidden bg-muted">
+                    <CameraStream
+                      name={camera.name}
+                      url={camera.url}
+                      protocol={camera.protocol}
+                    />
+                    <span className="camera-live-only absolute left-3 top-3">
+                      <Badge className="rounded-full bg-primary">{camera.protocol}</Badge>
                     </span>
+                    {isOffline && (
+                      <span className="absolute left-3 top-3">
+                        <Badge className="rounded-full bg-destructive">Offline</Badge>
+                      </span>
+                    )}
+                    <CameraFullscreenButton cameraName={camera.name} />
                   </div>
-                )}
-                <span className="absolute left-3 top-3">
-                  <Badge
-                    className={`rounded-full ${camera.status === "online" ? "bg-success" : "bg-destructive"}`}
-                  >
-                    {camera.status === "online" ? "Online" : "Offline"}
-                  </Badge>
-                </span>
-                <CameraFullscreenButton cameraName={camera.name} />
-              </div>
-              <div className="flex flex-col gap-3 p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-bold text-foreground">{camera.name}</h3>
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3.5" />
-                      {camera.location} · {camera.cam}
+                  <div className="flex flex-col gap-3 p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-foreground">{camera.name}</h3>
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <MapPin className="size-3.5" />
+                          {camera.location} · Cam {String(index + 1).padStart(2, "0")}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className={`rounded-full ${camera.status === "online" ? "bg-success/15 text-success" : ""}`}
+                      >
+                        {camera.status || "online"}
+                      </Badge>
+                    </div>
+                    <p className="truncate rounded-xl bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
+                      {camera.url}
                     </p>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full bg-card text-destructive"
+                        disabled={deletingId === camera.id}
+                        onClick={() => handleDelete(camera.id)}
+                      >
+                        {deletingId === camera.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                        Hapus
+                      </Button>
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="rounded-full">
-                    {camera.protocol}
-                  </Badge>
-                </div>
-                <p className="truncate rounded-xl bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {camera.url}
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1 rounded-full bg-card">
-                    <Pencil className="size-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full bg-card text-destructive"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </article>
-          ))}
-
-        </section>
+                </article>
+              );
+            })}
+          </section>
+        )}
       </div>
     </AppShell>
   );

@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, BrainCircuit, Siren } from "lucide-react";
+import { ArrowLeft, BrainCircuit, Loader2, Siren } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authApi } from "@/lib/api";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -34,10 +35,24 @@ function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void navigate({ to: "/dashboard" });
+    setErrorMessage(null);
+    setLoading(true);
+
+    try {
+      await authApi.register({ name, email, password });
+      void navigate({ to: "/dashboard" });
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Pendaftaran gagal. Silakan coba lagi."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -91,6 +106,12 @@ function RegisterPage() {
               Buat akun Rumi untuk Anda dan orang tersayang.
             </p>
 
+            {errorMessage && (
+              <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm font-semibold text-destructive">
+                {errorMessage}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="name">Nama Lengkap</Label>
@@ -102,6 +123,7 @@ function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="rounded-2xl bg-background px-4 py-6"
+                  disabled={loading}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -114,6 +136,7 @@ function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="rounded-2xl bg-background px-4 py-6"
+                  disabled={loading}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -127,10 +150,17 @@ function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="rounded-2xl bg-background px-4 py-6"
+                  disabled={loading}
                 />
               </div>
-              <Button type="submit" size="lg" className="rounded-full font-semibold">
-                Buat Akun
+              <Button
+                type="submit"
+                size="lg"
+                className="rounded-full font-semibold"
+                disabled={loading}
+              >
+                {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {loading ? "Mendaftarkan..." : "Buat Akun"}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
                 Dengan mendaftar, Anda menyetujui syarat layanan dan kebijakan privasi Rumi.

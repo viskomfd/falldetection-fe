@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Cctv, Lock, Mail, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { authApi, getUser, type User } from "@/lib/api";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
@@ -36,6 +38,26 @@ const NOTIFICATIONS = [
 ];
 
 function PengaturanPage() {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
+
+  useEffect(() => {
+    authApi
+      .getMe()
+      .then((user) => setCurrentUser(user))
+      .catch(() => {
+        // Fallback to local user
+      });
+  }, []);
+
+  function handleLogoutAll() {
+    authApi.logout();
+  }
+
+  const name = currentUser?.name || "Andi Pratama";
+  const email = currentUser?.email || "andi.pratama@keluarga.id";
+  const role = currentUser?.role || "Pendamping";
+  const initials = currentUser?.avatar_initials || "AP";
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
@@ -52,22 +74,22 @@ function PengaturanPage() {
             <h3 className="font-bold text-foreground">Akun</h3>
             <div className="flex items-center gap-4">
               <span className="flex size-14 items-center justify-center rounded-full bg-primary text-lg font-extrabold text-primary-foreground">
-                A
+                {initials}
               </span>
               <div>
-                <p className="font-bold text-foreground">Andi Pratama</p>
+                <p className="font-bold text-foreground">{name}</p>
                 <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Mail className="size-4" />
-                  andi.pratama@keluarga.id
+                  {email}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="rounded-full">
-                Peran: Pendamping Utama
+                Peran: {role}
               </Badge>
               <Badge variant="secondary" className="rounded-full">
-                3 anggota tim
+                Sistem AI Aktif
               </Badge>
             </div>
             <div className="flex gap-2">
@@ -136,11 +158,15 @@ function PengaturanPage() {
               </li>
               <li className="flex items-start gap-3">
                 <Smartphone className="mt-0.5 size-4 text-primary" />
-                Sesi aktif: 2 perangkat | Chrome desktop &amp; aplikasi pendamping mobile.
+                Sesi aktif: JWT Token tersimpan aman di browser Anda.
               </li>
             </ul>
             <div>
-              <Button variant="outline" className="rounded-full bg-card text-destructive">
+              <Button
+                variant="outline"
+                className="rounded-full bg-card text-destructive"
+                onClick={handleLogoutAll}
+              >
                 Keluar dari Semua Perangkat
               </Button>
             </div>
