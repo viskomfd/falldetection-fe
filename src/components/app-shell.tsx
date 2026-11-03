@@ -5,12 +5,16 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  Siren,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { authApi, getUser, type User } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { playFallAlarm, showDesktopNotification } from "@/lib/alarm";
+import { authApi, getUser, WS_BASE_URL, type Incident, type User } from "@/lib/api";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,6 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
+  const [floatingAlert, setFloatingAlert] = useState<Incident | null>(null);
 
   useEffect(() => {
     // Sync current user profile from backend
@@ -32,6 +37,49 @@ export function AppShell({ children }: { children: ReactNode }) {
       .catch(() => {
         // If not authenticated or token expired, keep cached user or allow graceful fallback
       });
+  }, []);
+
+  // Global WebSocket listener untuk notifikasi alarm real-time di seluruh halaman
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let heartbeatTimer: number | null = null;
+
+    try {
+      ws = new WebSocket(WS_BASE_URL);
+
+      ws.onopen = () => {
+        heartbeatTimer = window.setInterval(() => {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send("PING");
+          }
+        }, 25000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "FALL_ALERT" && msg.data) {
+            const incident = msg.data as Incident;
+            setFloatingAlert(incident);
+            playFallAlarm();
+            showDesktopNotification(
+              "🚨 PERINGATAN: Deteksi Jatuh!",
+              `Kejadian jatuh terdeteksi pada ${incident.person_name || "orang"} di ${incident.location || "kamera"}!`
+            );
+            window.dispatchEvent(new CustomEvent("rumi:fall-alert", { detail: incident }));
+          }
+        } catch {
+          // ignore non-json
+        }
+      };
+    } catch (e) {
+      console.warn("Global WebSocket init error:", e);
+    }
+
+    return () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      if (ws) ws.close();
+    };
   }, []);
 
   function handleLogout() {
@@ -116,6 +164,43 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex-1">{children}</div>
       </main>
+
+      {/* Floating real-time alert toast for entire application */}
+      {floatingAlert && (
+        <aside
+          role="alert"
+          aria-live="assertive"
+          className="card-shadow fixed right-6 top-6 z-50 flex max-w-md items-center gap-4 rounded-3xl border-2 border-destructive bg-card p-4 shadow-2xl animate-in slide-in-from-top-4"
+        >
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-destructive text-white animate-pulse">
+            <Siren className="size-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-destructive">
+              🚨 Fall Alert Terdeteksi!
+            </p>
+            <p className="truncate text-sm font-bold text-foreground">
+              {floatingAlert.camera_name || floatingAlert.location}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {floatingAlert.person_name || "Seseorang"} jatuh · Segera periksa!
+            </p>
+          </div>
+          <Button asChild size="sm" variant="destructive" className="rounded-full">
+            <Link to="/riwayat" onClick={() => setFloatingAlert(null)}>
+              Lihat
+            </Link>
+          </Button>
+          <button
+            type="button"
+            onClick={() => setFloatingAlert(null)}
+            className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Tutup notifikasi"
+          >
+            <X className="size-4" />
+          </button>
+        </aside>
+      )}
     </div>
   );
 }

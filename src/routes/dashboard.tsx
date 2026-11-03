@@ -3,6 +3,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Camera,
+  Cctv,
   ChevronRight,
   CircleAlert,
   Gauge,
@@ -107,12 +108,17 @@ function Dashboard() {
           const msg = JSON.parse(event.data);
           if (msg.type === "FALL_ALERT" && msg.data) {
             setActiveAlert(msg.data);
+            const todayDayCode = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"][new Date().getDay()];
             setStats((prev) => {
               if (!prev) return prev;
+              const updatedWeekly = prev.weekly_activity?.map((item) =>
+                item.day === todayDayCode ? { ...item, value: item.value + 1 } : item
+              ) ?? [];
               return {
                 ...prev,
                 today_incidents: prev.today_incidents + 1,
                 latest_incident: msg.data,
+                weekly_activity: updatedWeekly,
               };
             });
           }
@@ -128,9 +134,31 @@ function Dashboard() {
       console.warn("WebSocket init error:", e);
     }
 
+    const handleFallEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<Incident>;
+      if (customEvent.detail) {
+        setActiveAlert(customEvent.detail);
+        const todayDayCode = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"][new Date().getDay()];
+        setStats((prev) => {
+          if (!prev) return prev;
+          const updatedWeekly = prev.weekly_activity?.map((item) =>
+            item.day === todayDayCode ? { ...item, value: item.value + 1 } : item
+          ) ?? [];
+          return {
+            ...prev,
+            today_incidents: prev.today_incidents + 1,
+            latest_incident: customEvent.detail,
+            weekly_activity: updatedWeekly,
+          };
+        });
+      }
+    };
+    window.addEventListener("rumi:fall-alert", handleFallEvent);
+
     return () => {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (ws) ws.close();
+      window.removeEventListener("rumi:fall-alert", handleFallEvent);
     };
   }, []);
 
@@ -141,7 +169,7 @@ function Dashboard() {
   const unavailableCameraCount = Math.max(0, totalCameras - activeCamerasCount);
   const uptime = stats?.uptime_percentage ?? 99.6;
   const latency = stats?.latency_seconds ?? 2.4;
-  const todayIncidents = stats?.today_incidents ?? 1;
+  const todayIncidents = stats?.today_incidents ?? 0;
   const weeklyActivity = stats?.weekly_activity?.length
     ? stats.weekly_activity
     : DEFAULT_WEEK_ACTIVITY;
@@ -159,75 +187,91 @@ function Dashboard() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        {/* Fall alert banner */}
-        <section className="card-shadow flex flex-wrap items-center gap-4 rounded-3xl border border-destructive/30 bg-destructive/10 p-4">
-          <img
-            src={alertSnapshot}
-            alt={`Snapshot kejadian jatuh di ${alertLocation}`}
-            width={112}
-            height={64}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = fallSnapshot;
-            }}
-            className="h-16 w-28 rounded-2xl object-cover"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="gap-1 rounded-full">
-                <Siren className="size-3.5" />
-                Fall Alert
-              </Badge>
-              <span className="text-sm font-bold text-foreground">
-                {alertLocation} · {alertCam} · {alertTime}
-              </span>
+        {/* Fall alert banner - hanya muncul jika ada active alert */}
+        {activeAlert && (
+          <section className="card-shadow flex flex-wrap items-center gap-4 rounded-3xl border border-destructive/30 bg-destructive/10 p-4">
+            <img
+              src={alertSnapshot}
+              alt={`Snapshot kejadian jatuh di ${alertLocation}`}
+              width={112}
+              height={64}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = fallSnapshot;
+              }}
+              className="h-16 w-28 rounded-2xl object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="gap-1 rounded-full">
+                  <Siren className="size-3.5" />
+                  Fall Alert
+                </Badge>
+                <span className="text-sm font-bold text-foreground">
+                  {alertLocation} · {alertCam} · {alertTime}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Kejadian jatuh terdeteksi pada {alertPerson}. Notifikasi terkirim ke pendamping
+                dalam {alertResponseTime} detik.
+              </p>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Kejadian jatuh terdeteksi pada {alertPerson}. Notifikasi terkirim ke pendamping
-              dalam {alertResponseTime} detik.
-            </p>
-          </div>
-          <Button asChild variant="outline" className="rounded-full bg-card">
-            <Link to="/riwayat">Lihat Detail</Link>
-          </Button>
-        </section>
+            <Button asChild variant="outline" className="rounded-full bg-card">
+              <Link to="/riwayat">Lihat Detail</Link>
+            </Button>
+          </section>
+        )}
 
         <div className="grid items-start gap-5 xl:grid-cols-[2fr_1fr]">
           {/* Live grid */}
           <section className="grid content-start gap-5 sm:grid-cols-2">
-            {savedCameras.map((camera, index) => {
-              const isOffline = camera.status === "offline";
-              return (
-                <article
-                  key={camera.id}
-                  data-camera-frame
-                  className="card-shadow group relative aspect-video self-start overflow-hidden rounded-3xl bg-card"
-                >
-                  <CameraStream
-                    name={camera.name}
-                    url={camera.url}
-                    protocol={camera.protocol}
-                  />
-                  {!isOffline && camera.protocol === "HTTP" && (
-                    <div className="camera-live-only absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground">
-                      <span className="size-2 rounded-full bg-destructive" />
-                      Live
+            {savedCameras.length === 0 ? (
+              <div className="col-span-full card-shadow flex flex-col items-center justify-center rounded-3xl bg-card p-10 text-center">
+                <Cctv className="size-10 text-muted-foreground/50" />
+                <h3 className="mt-3 font-bold text-foreground">Belum ada kamera terdaftar</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tambahkan kamera CCTV atau IP Webcam untuk memantau feed secara live.
+                </p>
+                <Button asChild size="sm" className="mt-4 rounded-full">
+                  <Link to="/kamera">Tambah Kamera</Link>
+                </Button>
+              </div>
+            ) : (
+              savedCameras.map((camera, index) => {
+                const isOffline = camera.status === "offline";
+                return (
+                  <article
+                    key={camera.id}
+                    data-camera-frame
+                    className="card-shadow group relative aspect-video self-start overflow-hidden rounded-3xl bg-card"
+                  >
+                    <CameraStream
+                      cameraId={camera.id}
+                      name={camera.name}
+                      url={camera.url}
+                      protocol={camera.protocol}
+                    />
+                    {!isOffline && camera.protocol === "HTTP" && (
+                      <div className="camera-live-only absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground">
+                        <span className="size-2 rounded-full bg-destructive" />
+                        Live
+                      </div>
+                    )}
+                    {isOffline && (
+                      <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-destructive/90 px-3 py-1.5 text-xs font-bold text-white">
+                        Offline
+                      </div>
+                    )}
+                    <CameraFullscreenButton cameraName={camera.name} />
+                    <div className="camera-live-only absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10">
+                      <p className="text-sm font-bold text-card-teal-foreground">{camera.name}</p>
+                      <p className="text-xs text-card-teal-foreground/70">
+                        {camera.location} · Cam {String(index + 1).padStart(2, "0")}
+                      </p>
                     </div>
-                  )}
-                  {isOffline && (
-                    <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-destructive/90 px-3 py-1.5 text-xs font-bold text-white">
-                      Offline
-                    </div>
-                  )}
-                  <CameraFullscreenButton cameraName={camera.name} />
-                  <div className="camera-live-only absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10">
-                    <p className="text-sm font-bold text-card-teal-foreground">{camera.name}</p>
-                    <p className="text-xs text-card-teal-foreground/70">
-                      {camera.location} · Cam {String(index + 1).padStart(2, "0")}
-                    </p>
-                  </div>
-                </article>
-              );
-            })}
+                  </article>
+                );
+              })
+            )}
           </section>
 
           {/* Insights card */}
@@ -243,25 +287,34 @@ function Dashboard() {
               </Link>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl bg-card p-3 text-foreground">
-              <img
-                src={alertSnapshot}
-                alt="Snapshot insiden jatuh"
-                width={96}
-                height={64}
-                loading="lazy"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = fallSnapshot;
-                }}
-                className="h-14 w-20 shrink-0 rounded-xl object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{alertPerson} terdeteksi jatuh</p>
-                <p className="text-xs text-muted-foreground">
-                  {alertLocation} · {alertTime}
+            {activeAlert ? (
+              <div className="flex items-center gap-3 rounded-2xl bg-card p-3 text-foreground">
+                <img
+                  src={alertSnapshot}
+                  alt="Snapshot insiden jatuh"
+                  width={96}
+                  height={64}
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = fallSnapshot;
+                  }}
+                  className="h-14 w-20 shrink-0 rounded-xl object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{alertPerson} terdeteksi jatuh</p>
+                  <p className="text-xs text-muted-foreground">
+                    {alertLocation} · {alertTime}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-card p-4 text-foreground">
+                <p className="text-sm font-bold">Status Aman</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tidak ada insiden jatuh yang tercatat saat ini.
                 </p>
               </div>
-            </div>
+            )}
 
             <div className="rounded-2xl bg-card p-4 text-foreground">
               <p className="text-sm font-bold">Insiden Hari Ini</p>
@@ -369,17 +422,40 @@ function Dashboard() {
             </Badge>
           </div>
           <div className="mt-6 flex h-36 items-end gap-3">
-            {weeklyActivity.map((item) => (
-              <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-28 w-full items-end justify-center">
-                  <div
-                    className={`w-8 rounded-full ${item.value > 0 ? "bg-primary" : "bg-muted"}`}
-                    style={{ height: `${Math.max(item.value * 35, 8)}%` }}
-                  />
+            {weeklyActivity.map((item) => {
+              const maxVal = Math.max(...weeklyActivity.map((i) => i.value), 1);
+              const heightPercent =
+                item.value === 0
+                  ? 8
+                  : Math.max(22, Math.min(100, Math.round((item.value / maxVal) * 100)));
+              const todayCode = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"][new Date().getDay()];
+              const isToday = item.day === todayCode;
+
+              return (
+                <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
+                  <div className="flex h-28 w-full flex-col items-center justify-end">
+                    {item.value > 0 && (
+                      <span className="mb-1 text-[11px] font-bold text-primary">
+                        {item.value}
+                      </span>
+                    )}
+                    <div
+                      className={`w-8 rounded-full transition-all duration-300 ${
+                        item.value > 0 ? "bg-primary" : "bg-muted"
+                      }`}
+                      style={{ height: `${heightPercent}%` }}
+                    />
+                  </div>
+                  <span
+                    className={`text-xs font-semibold ${
+                      isToday ? "font-bold text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    {item.day}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-muted-foreground">{item.day}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </div>

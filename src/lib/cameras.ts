@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { cameraApi, type Camera } from "@/lib/api";
+import { cameraApi, getUser, type Camera } from "@/lib/api";
 
 export type CameraProtocol = "HTTP" | "RTSP";
 
@@ -12,8 +12,12 @@ export type SavedCamera = {
   status?: "online" | "offline";
 };
 
-const STORAGE_KEY = "rumi-cameras";
 const CAMERAS_CHANGED_EVENT = "rumi:cameras-changed";
+
+function getStorageKey(): string {
+  const user = getUser();
+  return user?.id ? `rumi-cameras_${user.id}` : "rumi-cameras_guest";
+}
 
 export function normalizeCameraUrl(url: string) {
   const trimmedUrl = url.trim();
@@ -36,7 +40,12 @@ export function getCameraProtocol(url: string): CameraProtocol {
 function readCachedCameras(): SavedCamera[] {
   if (typeof window === "undefined") return [];
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
+    // Clean legacy shared storage
+    if (window.localStorage.getItem("rumi-cameras")) {
+      window.localStorage.removeItem("rumi-cameras");
+    }
+    const key = getStorageKey();
+    const value = window.localStorage.getItem(key);
     return value ? (JSON.parse(value) as SavedCamera[]) : [];
   } catch {
     return [];
@@ -45,7 +54,8 @@ function readCachedCameras(): SavedCamera[] {
 
 function writeCachedCameras(cameras: SavedCamera[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cameras));
+  const key = getStorageKey();
+  window.localStorage.setItem(key, JSON.stringify(cameras));
   window.dispatchEvent(new Event(CAMERAS_CHANGED_EVENT));
 }
 
@@ -122,7 +132,7 @@ export function useSavedCameras() {
   useEffect(() => {
     // Initial fetch from backend
     void fetchCameras().then((res) => {
-      if (res.length > 0) setCameras(res);
+      setCameras(res);
     });
 
     const sync = () => setCameras(readCachedCameras());

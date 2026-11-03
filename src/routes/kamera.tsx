@@ -177,6 +177,7 @@ function KameraPage() {
                 <article key={camera.id} className="card-shadow overflow-hidden rounded-3xl bg-card">
                   <div data-camera-frame className="relative overflow-hidden bg-muted">
                     <CameraStream
+                      cameraId={camera.id}
                       name={camera.name}
                       url={camera.url}
                       protocol={camera.protocol}
