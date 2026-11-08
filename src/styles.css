@@ -143,6 +143,222 @@
   box-shadow: 0 14px 36px -20px oklch(0.4 0.07 185 / 0.35);
 }
 
+.rumi-night {
+  color-scheme: light;
+}
+
+.rumi-night-hero {
+  background:
+    radial-gradient(circle at 10% 20%, rgb(187 247 226 / 60%), transparent 26%),
+    radial-gradient(circle at 88% 22%, rgb(185 239 248 / 55%), transparent 27%),
+    radial-gradient(circle at 50% 72%, rgb(180 239 222 / 42%), transparent 34%),
+    linear-gradient(180deg, #f8fffc 0%, #eaf8f4 100%);
+}
+
+.rumi-night-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(13 113 102 / 3.5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(13 113 102 / 3.5%) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  pointer-events: none;
+}
+
+.rumi-aurora {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(90px);
+  pointer-events: none;
+}
+
+.rumi-aurora-one {
+  top: 9rem;
+  left: 4%;
+  width: 22rem;
+  height: 22rem;
+  background: rgb(145 240 209 / 34%);
+}
+
+.rumi-aurora-two {
+  top: 18rem;
+  right: 3%;
+  width: 25rem;
+  height: 25rem;
+  background: rgb(145 224 240 / 28%);
+}
+
+.rumi-device-stage::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  right: 7%;
+  bottom: 0;
+  left: 7%;
+  height: 44%;
+  background: linear-gradient(to bottom, transparent, #eaf8f4 84%);
+  pointer-events: none;
+}
+
+.rumi-browser {
+  transform: perspective(1100px) rotateX(2deg);
+  transform-origin: bottom;
+}
+
+.rumi-phone {
+  width: 190px;
+  height: 380px;
+}
+
+.rumi-phone-left,
+.rumi-phone-right {
+  position: absolute;
+  z-index: 30;
+  top: 4.5rem;
+}
+
+.rumi-phone-left {
+  left: 0;
+  transform: perspective(900px) rotateY(12deg) rotateZ(-2deg);
+}
+
+.rumi-phone-right {
+  right: 0;
+  transform: perspective(900px) rotateY(-12deg) rotateZ(2deg);
+}
+
+.rumi-scan-beam {
+  position: absolute;
+  z-index: 35;
+  top: 48%;
+  left: 50%;
+  width: min(70%, 700px);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, #0d7166, transparent);
+  box-shadow: 0 0 18px 3px rgb(13 113 102 / 18%);
+}
+
+.rumi-demo-frame {
+  box-shadow: 0 40px 100px -45px rgb(13 113 102 / 28%);
+}
+
+.rumi-detection-zone {
+  box-shadow: 0 0 28px rgb(13 113 102 / 18%);
+}
+
+.rumi-step-line {
+  background: linear-gradient(90deg, transparent, rgb(13 113 102 / 28%), transparent);
+}
+
+.rumi-honesty::before {
+  content: "";
+  position: absolute;
+  width: 34rem;
+  height: 34rem;
+  top: -22rem;
+  right: -10rem;
+  border-radius: 999px;
+  border: 1px solid rgb(13 113 102 / 10%);
+  box-shadow: 0 0 100px rgb(13 113 102 / 8%);
+}
+
+.rumi-final-cta {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(145 240 209 / 32%), transparent 42%),
+    linear-gradient(135deg, #effaf6, #dff3ed 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rumi-browser {
+    animation: rumi-arrive 800ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .rumi-phone-left {
+    animation: rumi-phone-left 900ms 100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .rumi-phone-right {
+    animation: rumi-phone-right 900ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .rumi-scan-beam {
+    animation: rumi-scan 3.6s ease-in-out infinite;
+  }
+
+  @keyframes rumi-arrive {
+    from {
+      opacity: 0;
+      transform: perspective(1100px) rotateX(8deg) translateY(2.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(1100px) rotateX(2deg) translateY(0);
+    }
+  }
+
+  @keyframes rumi-phone-left {
+    from {
+      opacity: 0;
+      transform: perspective(900px) rotateY(20deg) rotateZ(-5deg) translateX(-2rem);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(900px) rotateY(12deg) rotateZ(-2deg) translateX(0);
+    }
+  }
+
+  @keyframes rumi-phone-right {
+    from {
+      opacity: 0;
+      transform: perspective(900px) rotateY(-20deg) rotateZ(5deg) translateX(2rem);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(900px) rotateY(-12deg) rotateZ(2deg) translateX(0);
+    }
+  }
+
+  @keyframes rumi-scan {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: translate(-50%, -3rem) scaleX(0.72);
+    }
+    50% {
+      opacity: 1;
+      transform: translate(-50%, 3rem) scaleX(1);
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .rumi-phone {
+    width: 128px;
+    height: 272px;
+  }
+
+  .rumi-phone-left,
+  .rumi-phone-right {
+    top: 10rem;
+  }
+
+  .rumi-phone-left {
+    left: -1rem;
+  }
+
+  .rumi-phone-right {
+    right: -1rem;
+  }
+
+  .rumi-scan-beam {
+    top: 56%;
+    width: 82%;
+  }
+}
+
 [data-camera-frame]:has(.camera-stream-offline) .camera-live-only {
   display: none;
 }

@@ -85,7 +85,7 @@ function KameraPage() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+        <div className="flex flex-col items-stretch gap-3 px-1 sm:flex-row sm:items-center sm:justify-between sm:px-2">
           <div>
             <h2 className="text-xl font-extrabold text-foreground">Kamera CCTV</h2>
             <p className="text-sm text-muted-foreground">
@@ -94,17 +94,17 @@ function KameraPage() {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="rounded-full">
+              <Button className="w-full rounded-full sm:w-auto">
                 <Plus className="size-4" />
                 Tambah Kamera
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-3xl border-border bg-card sm:max-w-xl">
+            <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl border-border bg-card sm:max-w-xl">
               <DialogHeader>
                 <DialogTitle>Tambah kamera baru</DialogTitle>
                 <DialogDescription>
-                  Untuk IP Webcam Android, gunakan alamat video yang ditampilkan aplikasi,
-                  biasanya http://IP-HP:8080/video.
+                  Untuk IP Webcam Android, gunakan alamat video yang ditampilkan aplikasi, biasanya
+                  http://IP-HP:8080/video.
                 </DialogDescription>
               </DialogHeader>
               <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
@@ -162,11 +162,12 @@ function KameraPage() {
         </div>
 
         {savedCameras.length === 0 ? (
-          <div className="card-shadow flex flex-col items-center justify-center rounded-3xl bg-card p-12 text-center">
+          <div className="card-shadow flex flex-col items-center justify-center rounded-3xl bg-card p-6 text-center sm:p-12">
             <Cctv className="size-12 text-muted-foreground/50" />
             <h3 className="mt-4 font-bold text-foreground">Belum ada kamera terdaftar</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Klik tombol &quot;Tambah Kamera&quot; di atas untuk menghubungkan stream CCTV atau IP Webcam.
+              Klik tombol &quot;Tambah Kamera&quot; di atas untuk menghubungkan stream CCTV atau IP
+              Webcam.
             </p>
           </div>
         ) : (
@@ -174,7 +175,10 @@ function KameraPage() {
             {savedCameras.map((camera, index) => {
               const isOffline = camera.status === "offline";
               return (
-                <article key={camera.id} className="card-shadow overflow-hidden rounded-3xl bg-card">
+                <article
+                  key={camera.id}
+                  className="card-shadow overflow-hidden rounded-3xl bg-card"
+                >
                   <div data-camera-frame className="relative overflow-hidden bg-muted">
                     <CameraStream
                       cameraId={camera.id}

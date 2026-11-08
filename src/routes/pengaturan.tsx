@@ -31,10 +31,30 @@ export const Route = createFileRoute("/pengaturan")({
 });
 
 const NOTIFICATIONS = [
-  { id: "popup", title: "Pop-up Fall Alert di Dashboard", description: "Tampilkan banner merah segera saat insiden terdeteksi.", defaultChecked: true },
-  { id: "sound", title: "Alarm Suara", description: "Bunyikan alarm visual & audio saat fall alert diterima.", defaultChecked: true },
-  { id: "push", title: "Notifikasi Perangkat Pendamping", description: "Kirim alert ke seluruh perangkat pendamping yang terdaftar.", defaultChecked: true },
-  { id: "digest", title: "Ringkasan Harian", description: "Kirim rekap insiden & status kamera setiap pagi.", defaultChecked: false },
+  {
+    id: "popup",
+    title: "Pop-up Fall Alert di Dashboard",
+    description: "Tampilkan banner merah segera saat insiden terdeteksi.",
+    defaultChecked: true,
+  },
+  {
+    id: "sound",
+    title: "Alarm Suara",
+    description: "Bunyikan alarm visual & audio saat fall alert diterima.",
+    defaultChecked: true,
+  },
+  {
+    id: "push",
+    title: "Notifikasi Perangkat Pendamping",
+    description: "Kirim alert ke seluruh perangkat pendamping yang terdaftar.",
+    defaultChecked: true,
+  },
+  {
+    id: "digest",
+    title: "Ringkasan Harian",
+    description: "Kirim rekap insiden & status kamera setiap pagi.",
+    defaultChecked: false,
+  },
 ];
 
 function PengaturanPage() {
@@ -70,17 +90,17 @@ function PengaturanPage() {
 
         <div className="grid gap-5 xl:grid-cols-2">
           {/* Account */}
-          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-6">
+          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
             <h3 className="font-bold text-foreground">Akun</h3>
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-4">
               <span className="flex size-14 items-center justify-center rounded-full bg-primary text-lg font-extrabold text-primary-foreground">
                 {initials}
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="font-bold text-foreground">{name}</p>
-                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Mail className="size-4" />
-                  {email}
+                <p className="flex min-w-0 items-start gap-1.5 break-all text-sm text-muted-foreground">
+                  <Mail className="mt-0.5 size-4 shrink-0" />
+                  <span>{email}</span>
                 </p>
               </div>
             </div>
@@ -92,18 +112,18 @@ function PengaturanPage() {
                 Sistem AI Aktif
               </Badge>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-full bg-card">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" className="w-full rounded-full bg-card sm:w-auto">
                 Edit Profil
               </Button>
-              <Button variant="outline" className="rounded-full bg-card">
+              <Button variant="outline" className="w-full rounded-full bg-card sm:w-auto">
                 Ganti Password
               </Button>
             </div>
           </section>
 
           {/* Notifications */}
-          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-6">
+          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
             <h3 className="font-bold text-foreground">Notifikasi Fall Alert</h3>
             {NOTIFICATIONS.map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-4">
@@ -117,7 +137,7 @@ function PengaturanPage() {
           </section>
 
           {/* Protocols */}
-          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-6">
+          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
             <h3 className="font-bold text-foreground">Protokol Stream Didukung</h3>
             <p className="text-sm text-muted-foreground">
               Mode CCTV menerima input video melalui protokol berikut untuk pemrosesan AI.
@@ -128,12 +148,23 @@ function PengaturanPage() {
                 { name: "HTTP / MJPEG", detail: "http://ip:8080/video", tone: "secondary" },
                 { name: "HLS", detail: "http://ip/live/stream.m3u8", tone: "secondary" },
               ].map((protocol) => (
-                <li key={protocol.name} className="flex items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Cctv className="size-4 text-primary" />
-                    <span className="font-mono text-xs text-muted-foreground">{protocol.detail}</span>
+                <li
+                  key={protocol.name}
+                  className="flex flex-col items-start gap-2 rounded-2xl bg-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <Cctv className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <span className="break-all font-mono text-xs text-muted-foreground">
+                      {protocol.detail}
+                    </span>
                   </div>
-                  <Badge className={protocol.tone === "primary" ? "rounded-full" : "rounded-full bg-secondary text-secondary-foreground"}>
+                  <Badge
+                    className={
+                      protocol.tone === "primary"
+                        ? "rounded-full"
+                        : "rounded-full bg-secondary text-secondary-foreground"
+                    }
+                  >
                     {protocol.name}
                   </Badge>
                 </li>
@@ -145,7 +176,7 @@ function PengaturanPage() {
           </section>
 
           {/* Security */}
-          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-6">
+          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
             <h3 className="font-bold text-foreground">Keamanan Data</h3>
             <ul className="flex flex-col gap-3 text-sm text-muted-foreground">
               <li className="flex items-start gap-3">
@@ -164,7 +195,7 @@ function PengaturanPage() {
             <div>
               <Button
                 variant="outline"
-                className="rounded-full bg-card text-destructive"
+                className="w-full rounded-full bg-card text-destructive sm:w-auto"
                 onClick={handleLogoutAll}
               >
                 Keluar dari Semua Perangkat

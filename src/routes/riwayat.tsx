@@ -91,8 +91,8 @@ function RiwayatPage() {
         </div>
 
         {/* Filters */}
-        <section className="card-shadow flex flex-wrap items-end gap-4 rounded-3xl bg-card p-5">
-          <div className="flex flex-col gap-1.5">
+        <section className="card-shadow grid gap-4 rounded-3xl bg-card p-4 sm:grid-cols-2 sm:p-5 lg:flex lg:items-end">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor="filter-date" className="text-xs font-bold text-foreground">
               Rentang Tanggal
             </label>
@@ -102,7 +102,7 @@ function RiwayatPage() {
                 id="filter-date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="h-10 appearance-none rounded-xl bg-muted pl-9 pr-9 text-sm font-semibold text-foreground outline-none"
+                className="h-10 w-full appearance-none rounded-xl bg-muted pl-9 pr-9 text-sm font-semibold text-foreground outline-none lg:w-auto"
               >
                 <option value="7">7 hari terakhir</option>
                 <option value="30">30 hari terakhir</option>
@@ -112,7 +112,7 @@ function RiwayatPage() {
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor="filter-location" className="text-xs font-bold text-foreground">
               Lokasi Kamera
             </label>
@@ -121,7 +121,7 @@ function RiwayatPage() {
                 id="filter-location"
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
-                className="h-10 appearance-none rounded-xl bg-muted pl-4 pr-9 text-sm font-semibold text-foreground outline-none"
+                className="h-10 w-full appearance-none rounded-xl bg-muted pl-4 pr-9 text-sm font-semibold text-foreground outline-none lg:w-auto"
               >
                 <option value="all">Semua lokasi</option>
                 <option value="Ruang Tamu">Ruang Tamu</option>
@@ -132,7 +132,11 @@ function RiwayatPage() {
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
-          <Button className="rounded-full" onClick={handleApplyFilter} disabled={loading}>
+          <Button
+            className="rounded-full sm:col-span-2 lg:col-span-1"
+            onClick={handleApplyFilter}
+            disabled={loading}
+          >
             {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
             Terapkan Filter
           </Button>
@@ -150,9 +154,9 @@ function RiwayatPage() {
               <p className="font-semibold">Tidak ada insiden yang tercatat pada rentang ini.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
+            <div>
+              <table className="block w-full text-left text-sm md:table">
+                <thead className="hidden md:table-header-group">
                   <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-5 py-4 font-bold">Bukti</th>
                     <th className="px-5 py-4 font-bold">Tanggal &amp; Waktu</th>
@@ -160,7 +164,7 @@ function RiwayatPage() {
                     <th className="px-5 py-4 font-bold">Klip</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="block md:table-row-group">
                   {incidents.map((incident) => {
                     const { dateStr, timeStr } = formatIncidentDate(incident.detected_at);
                     const imageSrc = incident.snapshot_url
@@ -168,8 +172,11 @@ function RiwayatPage() {
                       : fallSnapshot;
 
                     return (
-                      <tr key={incident.id} className="border-b border-border last:border-0">
-                        <td className="px-5 py-3">
+                      <tr
+                        key={incident.id}
+                        className="grid grid-cols-[5rem_1fr] gap-x-4 border-b border-border px-4 py-4 last:border-0 md:table-row md:px-0 md:py-0"
+                      >
+                        <td className="row-span-3 py-1 md:table-cell md:px-5 md:py-3">
                           <img
                             src={imageSrc}
                             alt={`Snapshot insiden ${incident.camera_name || incident.location}`}
@@ -183,16 +190,27 @@ function RiwayatPage() {
                             className="h-12 w-20 rounded-xl object-cover"
                           />
                         </td>
-                        <td className="px-5 py-3 font-semibold text-foreground">
+                        <td
+                          data-label="Waktu"
+                          className="flex min-w-0 items-start justify-between gap-3 py-1 font-semibold text-foreground before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:px-5 md:py-3 md:before:hidden"
+                        >
                           {dateStr}
                           <span className="block text-xs font-medium text-muted-foreground">
                             {timeStr}
                           </span>
                         </td>
-                        <td className="px-5 py-3 font-semibold text-foreground">
-                          {incident.camera_name || incident.location}
+                        <td
+                          data-label="Kamera"
+                          className="flex min-w-0 items-start justify-between gap-3 py-1 font-semibold text-foreground before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:px-5 md:py-3 md:before:hidden"
+                        >
+                          <span className="min-w-0 text-right md:text-left">
+                            {incident.camera_name || incident.location}
+                          </span>
                         </td>
-                        <td className="px-5 py-3">
+                        <td
+                          data-label="Klip"
+                          className="flex items-center justify-between gap-3 py-1 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:px-5 md:py-3 md:before:hidden"
+                        >
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-foreground">
                             <Play className="size-3" />
                             {incident.clip_duration || "8 dtk"}
