@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
+import { getElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -45,11 +46,9 @@ function RegisterPage() {
 
     try {
       await authApi.register({ name, email, password });
-      void navigate({ to: "/dashboard" });
+      void navigate({ to: getElderlyName() ? "/dashboard" : "/setup-lansia" });
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Pendaftaran gagal. Silakan coba lagi."
-      );
+      setErrorMessage(err instanceof Error ? err.message : "Pendaftaran gagal. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
@@ -89,11 +88,7 @@ function RegisterPage() {
       {/* Form */}
       <main className="flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
-          <Button
-            asChild
-            variant="ghost"
-            className="-ml-2 mb-6 rounded-full text-muted-foreground"
-          >
+          <Button asChild variant="ghost" className="-ml-2 mb-6 rounded-full text-muted-foreground">
             <Link to="/">
               <ArrowLeft className="size-4" />
               Kembali ke beranda

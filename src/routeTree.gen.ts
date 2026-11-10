@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as PengaturanRouteImport } from './routes/pengaturan'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RiwayatRouteImport } from './routes/riwayat'
+import { Route as SetupLansiaRouteImport } from './routes/setup-lansia'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,11 @@ const RiwayatRoute = RiwayatRouteImport.update({
   path: '/riwayat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SetupLansiaRoute = SetupLansiaRouteImport.update({
+  id: '/setup-lansia',
+  path: '/setup-lansia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/pengaturan': typeof PengaturanRoute
   '/register': typeof RegisterRoute
   '/riwayat': typeof RiwayatRoute
+  '/setup-lansia': typeof SetupLansiaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/pengaturan': typeof PengaturanRoute
   '/register': typeof RegisterRoute
   '/riwayat': typeof RiwayatRoute
+  '/setup-lansia': typeof SetupLansiaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/pengaturan': typeof PengaturanRoute
   '/register': typeof RegisterRoute
   '/riwayat': typeof RiwayatRoute
+  '/setup-lansia': typeof SetupLansiaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/pengaturan'
     | '/register'
     | '/riwayat'
+    | '/setup-lansia'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/pengaturan'
     | '/register'
     | '/riwayat'
+    | '/setup-lansia'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/pengaturan'
     | '/register'
     | '/riwayat'
+    | '/setup-lansia'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   PengaturanRoute: typeof PengaturanRoute
   RegisterRoute: typeof RegisterRoute
   RiwayatRoute: typeof RiwayatRoute
+  SetupLansiaRoute: typeof SetupLansiaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RiwayatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/setup-lansia': {
+      id: '/setup-lansia'
+      path: '/setup-lansia'
+      fullPath: '/setup-lansia'
+      preLoaderRoute: typeof SetupLansiaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   PengaturanRoute: PengaturanRoute,
   RegisterRoute: RegisterRoute,
   RiwayatRoute: RiwayatRoute,
+  SetupLansiaRoute: SetupLansiaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

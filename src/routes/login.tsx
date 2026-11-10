@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
+import { getElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -19,8 +20,7 @@ export const Route = createFileRoute("/login")({
       { property: "og:title", content: "Rumi | Masuk ke Akun Anda" },
       {
         property: "og:description",
-        content:
-          "Masuk ke dashboard Rumi untuk memantau kamera dan menerima fall alert real-time.",
+        content: "Masuk ke dashboard Rumi untuk memantau kamera dan menerima fall alert real-time.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -43,10 +43,12 @@ function LoginPage() {
 
     try {
       await authApi.login({ email, password });
-      void navigate({ to: "/dashboard" });
+      void navigate({ to: getElderlyName() ? "/dashboard" : "/setup-lansia" });
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Gagal masuk. Periksa kembali email dan kata sandi Anda."
+        err instanceof Error
+          ? err.message
+          : "Gagal masuk. Periksa kembali email dan kata sandi Anda.",
       );
     } finally {
       setLoading(false);
@@ -87,11 +89,7 @@ function LoginPage() {
       {/* Form */}
       <main className="flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
-          <Button
-            asChild
-            variant="ghost"
-            className="-ml-2 mb-6 rounded-full text-muted-foreground"
-          >
+          <Button asChild variant="ghost" className="-ml-2 mb-6 rounded-full text-muted-foreground">
             <Link to="/">
               <ArrowLeft className="size-4" />
               Kembali ke beranda

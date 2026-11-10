@@ -26,6 +26,7 @@ import {
   type Incident,
 } from "@/lib/api";
 import { useSavedCameras } from "@/lib/cameras";
+import { useElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -72,6 +73,7 @@ function formatIncidentTime(isoString?: string): string {
 
 function Dashboard() {
   const savedCameras = useSavedCameras();
+  const elderlyName = useElderlyName();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activeAlert, setActiveAlert] = useState<Incident | null>(null);
 
@@ -184,7 +186,7 @@ function Dashboard() {
   const alertLocation = activeAlert?.location || "Ruang Tamu";
   const alertCam = activeAlert?.camera_name || "Cam 01";
   const alertTime = formatIncidentTime(activeAlert?.detected_at);
-  const alertPerson = activeAlert?.person_name || "Pak Hartono";
+  const alertPerson = elderlyName || activeAlert?.person_name || "Lansia";
   const alertResponseTime = activeAlert?.response_time_seconds || 2.1;
 
   return (

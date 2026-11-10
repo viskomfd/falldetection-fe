@@ -14,7 +14,22 @@ import { useEffect, useState, type ReactNode } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { playFallAlarm, showDesktopNotification } from "@/lib/alarm";
-import { authApi, getUser, WS_BASE_URL, type Incident, type User } from "@/lib/api";
+import {
+  authApi,
+  getToken,
+  getUser,
+  incidentApi,
+  WS_BASE_URL,
+  type Incident,
+  type User,
+} from "@/lib/api";
+import { useElderlyName } from "@/lib/elderly-profile";
+import {
+  hasUnreadIncidents,
+  markIncidentsRead,
+  markIncidentUnread,
+  useUnreadIncidents,
+} from "@/lib/incident-unread";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,21 +41,53 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const elderlyName = useElderlyName();
+  const hasUnreadHistory = useUnreadIncidents();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
   const [floatingAlert, setFloatingAlert] = useState<Incident | null>(null);
 
   useEffect(() => {
+    const authenticated = Boolean(getToken());
+    setIsAuthenticated(authenticated);
+    setAuthChecked(true);
+    if (!authenticated) void navigate({ to: "/login", replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     // Sync current user profile from backend
     authApi
       .getMe()
       .then((user) => setCurrentUser(user))
       .catch(() => {
-        // If not authenticated or token expired, keep cached user or allow graceful fallback
+        if (!getToken()) {
+          setIsAuthenticated(false);
+          void navigate({ to: "/login", replace: true });
+        }
       });
-  }, []);
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated && !elderlyName) void navigate({ to: "/setup-lansia", replace: true });
+  }, [elderlyName, isAuthenticated, navigate]);
 
   // Global WebSocket listener untuk notifikasi alarm real-time di seluruh halaman
   useEffect(() => {
+    if (!isAuthenticated) return;
+    void incidentApi
+      .list()
+      .then((incidents) => {
+        if (hasUnreadIncidents(incidents)) markIncidentUnread();
+      })
+      .catch(() => {
+        // The WebSocket still marks new incidents while the API is unavailable.
+      });
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     let ws: WebSocket | null = null;
     let heartbeatTimer: number | null = null;
 
@@ -61,10 +108,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           if (msg.type === "FALL_ALERT" && msg.data) {
             const incident = msg.data as Incident;
             setFloatingAlert(incident);
+            markIncidentUnread();
             playFallAlarm();
             showDesktopNotification(
               "🚨 PERINGATAN: Deteksi Jatuh!",
-              `Kejadian jatuh terdeteksi pada ${incident.person_name || "orang"} di ${incident.location || "kamera"}!`,
+              `Kejadian jatuh terdeteksi pada ${elderlyName || incident.person_name || "orang"} di ${incident.location || "kamera"}!`,
             );
             window.dispatchEvent(new CustomEvent("rumi:fall-alert", { detail: incident }));
           }
@@ -80,7 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (ws) ws.close();
     };
-  }, []);
+  }, [elderlyName, isAuthenticated]);
 
   function handleLogout() {
     authApi.logout();
@@ -89,6 +137,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const avatarInitials = currentUser?.avatar_initials || "AP";
   const displayName = currentUser?.name || "Pak Andi";
+
+  if (!authChecked || !isAuthenticated) return null;
 
   return (
     <div className="flex min-h-screen gap-5 p-3 pb-24 sm:p-4 sm:pb-24 lg:p-5 lg:pb-5">
@@ -112,6 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
+                onClick={item.to === "/riwayat" ? markIncidentsRead : undefined}
                 className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
                   isActive
                     ? "bg-primary text-primary-foreground card-shadow"
@@ -121,7 +172,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <item.icon className="size-5" strokeWidth={2} />
                 <span className="flex flex-1 items-center justify-between gap-2">
                   {item.label}
-                  {item.to === "/riwayat" && (
+                  {item.to === "/riwayat" && hasUnreadHistory && (
                     <span
                       aria-label="Ada insiden baru"
                       className="size-2.5 rounded-full bg-destructive ring-2 ring-card"
@@ -167,7 +218,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Selamat Siang, {displayName}!
             </h1>
             <p className="text-xs text-muted-foreground sm:text-sm">
-              Semua kamera dipantau secara real-time
+              Memantau {elderlyName || "lansia"} secara real-time
             </p>
           </div>
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-card bg-primary text-xs font-bold text-primary-foreground sm:size-11">
@@ -188,6 +239,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
+              onClick={item.to === "/riwayat" ? markIncidentsRead : undefined}
               aria-current={isActive ? "page" : undefined}
               className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:flex-row sm:justify-center sm:gap-2 sm:text-xs ${
                 isActive
@@ -197,7 +249,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <item.icon className="size-5 shrink-0" strokeWidth={2} />
               <span className="truncate">{item.label}</span>
-              {item.to === "/riwayat" && (
+              {item.to === "/riwayat" && hasUnreadHistory && (
                 <span
                   aria-label="Ada insiden baru"
                   className="absolute right-2 top-1.5 size-2 rounded-full bg-destructive ring-2 ring-card sm:right-3"
@@ -226,11 +278,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               {floatingAlert.camera_name || floatingAlert.location}
             </p>
             <p className="text-xs text-muted-foreground">
-              {floatingAlert.person_name || "Seseorang"} jatuh · Segera periksa!
+              {elderlyName || floatingAlert.person_name || "Seseorang"} jatuh · Segera periksa!
             </p>
           </div>
           <Button asChild size="sm" variant="destructive" className="rounded-full">
-            <Link to="/riwayat" onClick={() => setFloatingAlert(null)}>
+            <Link
+              to="/riwayat"
+              onClick={() => {
+                markIncidentsRead();
+                setFloatingAlert(null);
+              }}
+            >
               Lihat
             </Link>
           </Button>

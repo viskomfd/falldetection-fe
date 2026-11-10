@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Cctv, Lock, Mail, Smartphone } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Cctv, HeartHandshake, Lock, Mail, Smartphone } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { authApi, getUser, type User } from "@/lib/api";
+import { getElderlyName, saveElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
@@ -59,6 +62,9 @@ const NOTIFICATIONS = [
 
 function PengaturanPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
+  const [elderlyName, setElderlyName] = useState(() => getElderlyName());
+  const [elderlySaved, setElderlySaved] = useState(false);
+  const [elderlyError, setElderlyError] = useState("");
 
   useEffect(() => {
     authApi
@@ -71,6 +77,18 @@ function PengaturanPage() {
 
   function handleLogoutAll() {
     authApi.logout();
+  }
+
+  function handleElderlySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      saveElderlyName(elderlyName);
+      setElderlyName(getElderlyName());
+      setElderlyError("");
+      setElderlySaved(true);
+    } catch (error) {
+      setElderlyError(error instanceof Error ? error.message : "Nama lansia gagal disimpan.");
+    }
   }
 
   const name = currentUser?.name || "Andi Pratama";
@@ -120,6 +138,52 @@ function PengaturanPage() {
                 Ganti Password
               </Button>
             </div>
+          </section>
+
+          {/* Elderly profile */}
+          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <HeartHandshake className="size-5" />
+              </span>
+              <div>
+                <h3 className="font-bold text-foreground">Profil Lansia</h3>
+                <p className="text-xs text-muted-foreground">
+                  Digunakan pada dashboard dan notifikasi deteksi jatuh.
+                </p>
+              </div>
+            </div>
+            <form
+              onSubmit={handleElderlySubmit}
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            >
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label htmlFor="settings-elderly-name">Nama Lansia</Label>
+                <Input
+                  id="settings-elderly-name"
+                  required
+                  value={elderlyName}
+                  onChange={(event) => {
+                    setElderlyName(event.target.value);
+                    setElderlySaved(false);
+                    setElderlyError("");
+                  }}
+                  placeholder="Contoh: Ibu Siti"
+                  className="rounded-xl bg-muted"
+                />
+              </div>
+              <Button type="submit" className="rounded-full">
+                Simpan
+              </Button>
+            </form>
+            {elderlyError && (
+              <p className="text-xs font-semibold text-destructive">{elderlyError}</p>
+            )}
+            {elderlySaved && (
+              <p role="status" className="text-xs font-semibold text-success">
+                Nama lansia berhasil diperbarui.
+              </p>
+            )}
           </section>
 
           {/* Notifications */}

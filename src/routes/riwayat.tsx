@@ -6,6 +6,9 @@ import fallSnapshot from "@/assets/fall-snapshot.jpg";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { incidentApi, resolveMediaUrl, type Incident } from "@/lib/api";
+import { useSavedCameras } from "@/lib/cameras";
+import { useElderlyName } from "@/lib/elderly-profile";
+import { markIncidentsRead } from "@/lib/incident-unread";
 
 export const Route = createFileRoute("/riwayat")({
   head: () => ({
@@ -52,6 +55,8 @@ function formatIncidentDate(isoString?: string): { dateStr: string; timeStr: str
 }
 
 function RiwayatPage() {
+  const elderlyName = useElderlyName();
+  const savedCameras = useSavedCameras();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState("7");
@@ -73,8 +78,15 @@ function RiwayatPage() {
   }
 
   useEffect(() => {
+    markIncidentsRead();
     void loadIncidents();
+    // Filter changes are applied only after the user presses the button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const cameraLocations = Array.from(
+    new Set(savedCameras.map((camera) => camera.location.trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, "id"));
 
   function handleApplyFilter() {
     void loadIncidents();
@@ -124,10 +136,11 @@ function RiwayatPage() {
                 className="h-10 w-full appearance-none rounded-xl bg-muted pl-4 pr-9 text-sm font-semibold text-foreground outline-none lg:w-auto"
               >
                 <option value="all">Semua lokasi</option>
-                <option value="Ruang Tamu">Ruang Tamu</option>
-                <option value="Kamar Utama">Kamar Utama</option>
-                <option value="Dapur">Dapur</option>
-                <option value="Garasi">Garasi</option>
+                {cameraLocations.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             </div>
@@ -160,6 +173,7 @@ function RiwayatPage() {
                   <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-5 py-4 font-bold">Bukti</th>
                     <th className="px-5 py-4 font-bold">Tanggal &amp; Waktu</th>
+                    <th className="px-5 py-4 font-bold">Lansia</th>
                     <th className="px-5 py-4 font-bold">Kamera / Lokasi</th>
                     <th className="px-5 py-4 font-bold">Klip</th>
                   </tr>
@@ -176,7 +190,7 @@ function RiwayatPage() {
                         key={incident.id}
                         className="grid grid-cols-[5rem_1fr] gap-x-4 border-b border-border px-4 py-4 last:border-0 md:table-row md:px-0 md:py-0"
                       >
-                        <td className="row-span-3 py-1 md:table-cell md:px-5 md:py-3">
+                        <td className="row-span-4 py-1 md:table-cell md:px-5 md:py-3">
                           <img
                             src={imageSrc}
                             alt={`Snapshot insiden ${incident.camera_name || incident.location}`}
@@ -197,6 +211,14 @@ function RiwayatPage() {
                           {dateStr}
                           <span className="block text-xs font-medium text-muted-foreground">
                             {timeStr}
+                          </span>
+                        </td>
+                        <td
+                          data-label="Lansia"
+                          className="flex min-w-0 items-start justify-between gap-3 py-1 font-semibold text-foreground before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:px-5 md:py-3 md:before:hidden"
+                        >
+                          <span className="min-w-0 text-right md:text-left">
+                            {elderlyName || incident.person_name || "Lansia"}
                           </span>
                         </td>
                         <td
