@@ -46,6 +46,7 @@ export interface Incident {
   detected_at: string;
   confidence: number;
   snapshot_url?: string | null;
+  clip_url?: string | null;
   clip_duration: string;
   response_time_seconds: number;
   status: string;

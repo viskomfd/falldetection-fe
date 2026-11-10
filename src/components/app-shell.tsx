@@ -30,6 +30,7 @@ import {
   markIncidentUnread,
   useUnreadIncidents,
 } from "@/lib/incident-unread";
+import { getNotificationPreferences } from "@/lib/notification-preferences";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -107,13 +108,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           const msg = JSON.parse(event.data);
           if (msg.type === "FALL_ALERT" && msg.data) {
             const incident = msg.data as Incident;
-            setFloatingAlert(incident);
+            const preferences = getNotificationPreferences();
+            if (preferences.popup) setFloatingAlert(incident);
             markIncidentUnread();
-            playFallAlarm();
-            showDesktopNotification(
-              "🚨 PERINGATAN: Deteksi Jatuh!",
-              `Kejadian jatuh terdeteksi pada ${elderlyName || incident.person_name || "orang"} di ${incident.location || "kamera"}!`,
-            );
+            if (preferences.sound) playFallAlarm();
+            if (preferences.desktop) {
+              showDesktopNotification(
+                "🚨 PERINGATAN: Deteksi Jatuh!",
+                `Kejadian jatuh terdeteksi pada ${elderlyName || incident.person_name || "orang"} di ${incident.location || "kamera"}!`,
+              );
+            }
             window.dispatchEvent(new CustomEvent("rumi:fall-alert", { detail: incident }));
           }
         } catch {
@@ -212,7 +216,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <header className="flex items-center justify-between gap-3 px-1 pb-4 sm:px-2 sm:pb-6 lg:pt-1">
+        <header
+          className={`${pathname === "/dashboard" ? "flex" : "hidden lg:flex"} items-center justify-between gap-3 px-1 pb-4 sm:px-2 sm:pb-6 lg:pt-1`}
+        >
           <div className="min-w-0">
             <h1 className="truncate text-xl font-extrabold text-foreground sm:text-2xl">
               Selamat Siang, {displayName}!

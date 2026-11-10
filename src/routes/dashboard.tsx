@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   Camera,
   Cctv,
-  ChevronRight,
   CircleAlert,
   Gauge,
   RadioTower,
@@ -18,15 +17,10 @@ import { CameraFullscreenButton } from "@/components/camera-fullscreen-button";
 import { CameraStream } from "@/components/camera-stream";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  dashboardApi,
-  resolveMediaUrl,
-  WS_BASE_URL,
-  type DashboardStats,
-  type Incident,
-} from "@/lib/api";
+import { dashboardApi, resolveMediaUrl, type DashboardStats, type Incident } from "@/lib/api";
 import { useSavedCameras } from "@/lib/cameras";
 import { useElderlyName } from "@/lib/elderly-profile";
+import { getNotificationPreferences } from "@/lib/notification-preferences";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -76,6 +70,7 @@ function Dashboard() {
   const elderlyName = useElderlyName();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activeAlert, setActiveAlert] = useState<Incident | null>(null);
+  const notificationPreferences = getNotificationPreferences();
 
   useEffect(() => {
     // 1. Fetch dashboard stats
@@ -88,56 +83,6 @@ function Dashboard() {
         }
       })
       .catch((err) => console.warn("Could not fetch dashboard summary:", err));
-
-    // 2. Setup WebSocket for real-time Fall Alert
-    let ws: WebSocket | null = null;
-    let heartbeatTimer: number | null = null;
-
-    try {
-      ws = new WebSocket(WS_BASE_URL);
-
-      ws.onopen = () => {
-        // Send heartbeat ping every 25s
-        heartbeatTimer = window.setInterval(() => {
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send("PING");
-          }
-        }, 25000);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "FALL_ALERT" && msg.data) {
-            setActiveAlert(msg.data);
-            const todayDayCode = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"][
-              new Date().getDay()
-            ];
-            setStats((prev) => {
-              if (!prev) return prev;
-              const updatedWeekly =
-                prev.weekly_activity?.map((item) =>
-                  item.day === todayDayCode ? { ...item, value: item.value + 1 } : item,
-                ) ?? [];
-              return {
-                ...prev,
-                today_incidents: prev.today_incidents + 1,
-                latest_incident: msg.data,
-                weekly_activity: updatedWeekly,
-              };
-            });
-          }
-        } catch {
-          // ignore non-json messages
-        }
-      };
-
-      ws.onerror = (e) => {
-        console.warn("WebSocket alerts connection note:", e);
-      };
-    } catch (e) {
-      console.warn("WebSocket init error:", e);
-    }
 
     const handleFallEvent = (e: Event) => {
       const customEvent = e as CustomEvent<Incident>;
@@ -162,8 +107,6 @@ function Dashboard() {
     window.addEventListener("rumi:fall-alert", handleFallEvent);
 
     return () => {
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (ws) ws.close();
       window.removeEventListener("rumi:fall-alert", handleFallEvent);
     };
   }, []);
@@ -174,7 +117,6 @@ function Dashboard() {
   const unavailableCameraCount = Math.max(0, totalCameras - activeCamerasCount);
   const uptime = stats?.uptime_percentage ?? 99.6;
   const latency = stats?.latency_seconds ?? 2.4;
-  const todayIncidents = stats?.today_incidents ?? 0;
   const weeklyActivity = stats?.weekly_activity?.length
     ? stats.weekly_activity
     : DEFAULT_WEEK_ACTIVITY;
@@ -193,7 +135,7 @@ function Dashboard() {
     <AppShell>
       <div className="flex flex-col gap-5">
         {/* Fall alert banner - hanya muncul jika ada active alert */}
-        {activeAlert && (
+        {notificationPreferences.popup && activeAlert && (
           <section className="card-shadow flex flex-col items-stretch gap-4 rounded-3xl border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center">
             <img
               src={alertSnapshot}
@@ -226,7 +168,7 @@ function Dashboard() {
           </section>
         )}
 
-        <div className="grid items-start gap-5 xl:grid-cols-[2fr_1fr]">
+        <div>
           {/* Live grid */}
           <section className="grid content-start gap-4 sm:grid-cols-2 lg:gap-5">
             {savedCameras.length === 0 ? (
@@ -277,72 +219,6 @@ function Dashboard() {
                 );
               })
             )}
-          </section>
-
-          {/* Insights card */}
-          <section className="card-shadow flex flex-col gap-3 rounded-3xl bg-card-teal p-4 text-card-teal-foreground">
-            <div className="flex items-center justify-between px-2 pt-1">
-              <h2 className="text-lg font-bold">Insiden Terbaru</h2>
-              <Link
-                to="/riwayat"
-                aria-label="Lihat semua insiden"
-                className="flex size-8 items-center justify-center rounded-full bg-white/15 hover:bg-white/25"
-              >
-                <ChevronRight className="size-4" />
-              </Link>
-            </div>
-
-            {activeAlert ? (
-              <div className="flex items-center gap-3 rounded-2xl bg-card p-3 text-foreground">
-                <img
-                  src={alertSnapshot}
-                  alt="Snapshot insiden jatuh"
-                  width={96}
-                  height={64}
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = fallSnapshot;
-                  }}
-                  className="h-14 w-20 shrink-0 rounded-xl object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{alertPerson} terdeteksi jatuh</p>
-                  <p className="text-xs text-muted-foreground">
-                    {alertLocation} · {alertTime}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl bg-card p-4 text-foreground">
-                <p className="text-sm font-bold">Status Aman</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Tidak ada insiden jatuh yang tercatat saat ini.
-                </p>
-              </div>
-            )}
-
-            <div className="rounded-2xl bg-card p-4 text-foreground">
-              <p className="text-sm font-bold">Insiden Hari Ini</p>
-              <div className="mt-1 flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Tercatat</span>
-                <span className="text-sm font-extrabold text-success">
-                  <ArrowUpRight className="mr-1 inline size-4" />
-                  {todayIncidents} kejadian
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-card p-4 text-foreground">
-              <p className="text-sm font-bold">Waktu Pengiriman Alert</p>
-              <div className="mt-1 flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Target &lt; 3 detik</span>
-                <span className="text-sm font-extrabold text-success">{latency} detik</span>
-              </div>
-            </div>
-
-            <div className="mt-auto rounded-2xl bg-white/15 p-4">
-              <p className="text-sm font-semibold">Notifikasi insiden aktif di sistem Rumi.</p>
-            </div>
           </section>
         </div>
 

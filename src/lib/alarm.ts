@@ -52,3 +52,9 @@ export function showDesktopNotification(title: string, body: string): void {
   }
 }
 
+export async function requestDesktopNotificationPermission(): Promise<boolean> {
+  if (typeof window === "undefined" || !("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  return (await Notification.requestPermission()) === "granted";
+}

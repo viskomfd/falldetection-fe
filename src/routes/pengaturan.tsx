@@ -16,8 +16,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { playFallAlarm, requestDesktopNotificationPermission } from "@/lib/alarm";
 import { authApi, getUser, type User } from "@/lib/api";
 import { getElderlyName, saveElderlyName } from "@/lib/elderly-profile";
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationPreferences,
+} from "@/lib/notification-preferences";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
@@ -46,27 +52,22 @@ const NOTIFICATIONS = [
     id: "popup",
     title: "Pop-up Fall Alert di Dashboard",
     description: "Tampilkan banner merah segera saat insiden terdeteksi.",
-    defaultChecked: true,
   },
   {
     id: "sound",
     title: "Alarm Suara",
     description: "Bunyikan alarm visual & audio saat fall alert diterima.",
-    defaultChecked: true,
   },
   {
-    id: "push",
-    title: "Notifikasi Perangkat Pendamping",
-    description: "Kirim alert ke seluruh perangkat pendamping yang terdaftar.",
-    defaultChecked: true,
+    id: "desktop",
+    title: "Notifikasi Desktop Browser",
+    description: "Tampilkan notifikasi sistem saat dashboard sedang terbuka.",
   },
-  {
-    id: "digest",
-    title: "Ringkasan Harian",
-    description: "Kirim rekap insiden & status kamera setiap pagi.",
-    defaultChecked: false,
-  },
-];
+] satisfies Array<{
+  id: keyof NotificationPreferences;
+  title: string;
+  description: string;
+}>;
 
 function PengaturanPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
@@ -83,6 +84,10 @@ function PengaturanPage() {
   const [modalError, setModalError] = useState("");
   const [saving, setSaving] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [notificationPreferences, setNotificationPreferences] = useState(() =>
+    getNotificationPreferences(),
+  );
+  const [notificationError, setNotificationError] = useState("");
 
   useEffect(() => {
     authApi
@@ -155,6 +160,18 @@ function PengaturanPage() {
     }
   }
 
+  async function handleNotificationChange(id: keyof NotificationPreferences, checked: boolean) {
+    setNotificationError("");
+    if (id === "desktop" && checked && !(await requestDesktopNotificationPermission())) {
+      setNotificationError("Izin notifikasi browser ditolak. Aktifkan melalui pengaturan browser.");
+      return;
+    }
+    if (id === "sound" && checked) playFallAlarm();
+    const next = { ...notificationPreferences, [id]: checked };
+    setNotificationPreferences(next);
+    saveNotificationPreferences(next);
+  }
+
   const name = currentUser?.name || "Andi Pratama";
   const email = currentUser?.email || "andi.pratama@keluarga.id";
   const role = currentUser?.role || "Pendamping";
@@ -216,52 +233,50 @@ function PengaturanPage() {
                 Ganti Password
               </Button>
             </div>
-          </section>
-
-          {/* Elderly profile */}
-          <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <HeartHandshake className="size-5" />
-              </span>
-              <div>
-                <h3 className="font-bold text-foreground">Profil Lansia</h3>
-                <p className="text-xs text-muted-foreground">
-                  Digunakan pada dashboard dan notifikasi deteksi jatuh.
+            <div className="border-t border-border pt-4">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <HeartHandshake className="size-5" />
+                </span>
+                <div>
+                  <h3 className="font-bold text-foreground">Profil Lansia</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Digunakan pada dashboard dan notifikasi deteksi jatuh.
+                  </p>
+                </div>
+              </div>
+              <form
+                onSubmit={handleElderlySubmit}
+                className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+              >
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor="settings-elderly-name">Nama Lansia</Label>
+                  <Input
+                    id="settings-elderly-name"
+                    required
+                    value={elderlyName}
+                    onChange={(event) => {
+                      setElderlyName(event.target.value);
+                      setElderlySaved(false);
+                      setElderlyError("");
+                    }}
+                    placeholder="Contoh: Ibu Siti"
+                    className="rounded-xl bg-muted"
+                  />
+                </div>
+                <Button type="submit" className="rounded-full">
+                  Simpan
+                </Button>
+              </form>
+              {elderlyError && (
+                <p className="mt-2 text-xs font-semibold text-destructive">{elderlyError}</p>
+              )}
+              {elderlySaved && (
+                <p role="status" className="mt-2 text-xs font-semibold text-success">
+                  Nama lansia berhasil diperbarui.
                 </p>
-              </div>
+              )}
             </div>
-            <form
-              onSubmit={handleElderlySubmit}
-              className="flex flex-col gap-3 sm:flex-row sm:items-end"
-            >
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Label htmlFor="settings-elderly-name">Nama Lansia</Label>
-                <Input
-                  id="settings-elderly-name"
-                  required
-                  value={elderlyName}
-                  onChange={(event) => {
-                    setElderlyName(event.target.value);
-                    setElderlySaved(false);
-                    setElderlyError("");
-                  }}
-                  placeholder="Contoh: Ibu Siti"
-                  className="rounded-xl bg-muted"
-                />
-              </div>
-              <Button type="submit" className="rounded-full">
-                Simpan
-              </Button>
-            </form>
-            {elderlyError && (
-              <p className="text-xs font-semibold text-destructive">{elderlyError}</p>
-            )}
-            {elderlySaved && (
-              <p role="status" className="text-xs font-semibold text-success">
-                Nama lansia berhasil diperbarui.
-              </p>
-            )}
           </section>
 
           {/* Notifications */}
@@ -273,9 +288,16 @@ function PengaturanPage() {
                   <p className="text-sm font-bold text-foreground">{item.title}</p>
                   <p className="text-xs text-muted-foreground">{item.description}</p>
                 </div>
-                <Switch defaultChecked={item.defaultChecked} />
+                <Switch
+                  checked={notificationPreferences[item.id]}
+                  onCheckedChange={(checked) => void handleNotificationChange(item.id, checked)}
+                  aria-label={item.title}
+                />
               </div>
             ))}
+            {notificationError && (
+              <p className="text-xs font-semibold text-destructive">{notificationError}</p>
+            )}
           </section>
 
           {/* Protocols */}

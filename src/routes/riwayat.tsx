@@ -2,9 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, ChevronDown, Loader2, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import fallSnapshot from "@/assets/fall-snapshot.jpg";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { incidentApi, resolveMediaUrl, type Incident } from "@/lib/api";
 import { useSavedCameras } from "@/lib/cameras";
 import { useElderlyName } from "@/lib/elderly-profile";
@@ -61,14 +67,15 @@ function RiwayatPage() {
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState("7");
   const [locationFilter, setLocationFilter] = useState("all");
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
 
   async function loadIncidents() {
     try {
       setLoading(true);
-      const data = await incidentApi.list({
-        days: dateFilter === "all" ? undefined : Number(dateFilter),
-        location: locationFilter === "all" ? undefined : locationFilter,
-      });
+      const filters: { days?: number; location?: string } = {};
+      if (dateFilter !== "all") filters.days = Number(dateFilter);
+      if (locationFilter !== "all") filters.location = locationFilter;
+      const data = await incidentApi.list(filters);
       setIncidents(data);
     } catch (err) {
       console.error("Gagal memuat riwayat insiden:", err);
@@ -181,9 +188,7 @@ function RiwayatPage() {
                 <tbody className="block md:table-row-group">
                   {incidents.map((incident) => {
                     const { dateStr, timeStr } = formatIncidentDate(incident.detected_at);
-                    const imageSrc = incident.snapshot_url
-                      ? resolveMediaUrl(incident.snapshot_url)
-                      : fallSnapshot;
+                    const imageSrc = resolveMediaUrl(incident.snapshot_url);
 
                     return (
                       <tr
@@ -191,18 +196,22 @@ function RiwayatPage() {
                         className="grid grid-cols-[5rem_1fr] gap-x-4 border-b border-border px-4 py-4 last:border-0 md:table-row md:px-0 md:py-0"
                       >
                         <td className="row-span-4 py-1 md:table-cell md:px-5 md:py-3">
-                          <img
-                            src={imageSrc}
-                            alt={`Snapshot insiden ${incident.camera_name || incident.location}`}
-                            width={1280}
-                            height={720}
-                            loading="lazy"
-                            onError={(e) => {
-                              // Fallback if remote image not found
-                              (e.target as HTMLImageElement).src = fallSnapshot;
-                            }}
-                            className="h-12 w-20 rounded-xl object-cover"
-                          />
+                          <div className="relative flex h-12 w-20 items-center justify-center overflow-hidden rounded-xl bg-muted px-1 text-center text-[10px] text-muted-foreground">
+                            Bukti tidak tersedia
+                            {imageSrc && (
+                              <img
+                                src={imageSrc}
+                                alt={`Snapshot insiden ${incident.camera_name || incident.location}`}
+                                width={1280}
+                                height={720}
+                                loading="lazy"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                                className="absolute inset-0 size-full object-cover"
+                              />
+                            )}
+                          </div>
                         </td>
                         <td
                           data-label="Waktu"
@@ -233,10 +242,19 @@ function RiwayatPage() {
                           data-label="Klip"
                           className="flex items-center justify-between gap-3 py-1 before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:px-5 md:py-3 md:before:hidden"
                         >
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-foreground">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-auto rounded-full px-3 py-1.5 text-xs"
+                            disabled={!incident.clip_url}
+                            onClick={() => setSelectedIncident(incident)}
+                          >
                             <Play className="size-3" />
-                            {incident.clip_duration || "8 dtk"}
-                          </span>
+                            {incident.clip_url
+                              ? incident.clip_duration || "Putar"
+                              : "Tidak tersedia"}
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -246,6 +264,36 @@ function RiwayatPage() {
             </div>
           )}
         </section>
+
+        <Dialog
+          open={Boolean(selectedIncident)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedIncident(null);
+          }}
+        >
+          <DialogContent className="max-w-3xl rounded-3xl p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle>Klip Kejadian Jatuh</DialogTitle>
+              <DialogDescription>
+                {selectedIncident?.camera_name || selectedIncident?.location} ·{" "}
+                {formatIncidentDate(selectedIncident?.detected_at).dateStr}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedIncident?.clip_url && (
+              <video
+                key={selectedIncident.id}
+                controls
+                autoPlay
+                preload="metadata"
+                poster={resolveMediaUrl(selectedIncident.snapshot_url)}
+                className="max-h-[70vh] w-full rounded-2xl bg-black"
+              >
+                <source src={resolveMediaUrl(selectedIncident.clip_url)} />
+                Browser Anda tidak mendukung pemutaran video.
+              </video>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );
