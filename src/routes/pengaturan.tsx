@@ -1,10 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Cctv, HeartHandshake, Lock, Mail, Smartphone } from "lucide-react";
+import { Cctv, HeartHandshake, Loader2, Lock, Mail, Smartphone } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -65,29 +73,85 @@ function PengaturanPage() {
   const [elderlyName, setElderlyName] = useState(() => getElderlyName());
   const [elderlySaved, setElderlySaved] = useState(false);
   const [elderlyError, setElderlyError] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [profileName, setProfileName] = useState(() => getUser()?.name ?? "");
+  const [profileEmail, setProfileEmail] = useState(() => getUser()?.email ?? "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [modalError, setModalError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   useEffect(() => {
     authApi
       .getMe()
-      .then((user) => setCurrentUser(user))
+      .then((user) => {
+        setCurrentUser(user);
+        setProfileName(user.name);
+        setProfileEmail(user.email);
+        setElderlyName(user.elderly_name ?? "");
+      })
       .catch(() => {
         // Fallback to local user
       });
   }, []);
 
-  function handleLogoutAll() {
-    authApi.logout();
+  async function handleLogoutAll() {
+    setLogoutError("");
+    try {
+      await authApi.logoutAll();
+      window.location.href = "/login";
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "Sesi gagal dihentikan.");
+    }
   }
 
-  function handleElderlySubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleElderlySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      saveElderlyName(elderlyName);
-      setElderlyName(getElderlyName());
+      setElderlyName(await saveElderlyName(elderlyName));
       setElderlyError("");
       setElderlySaved(true);
     } catch (error) {
       setElderlyError(error instanceof Error ? error.message : "Nama lansia gagal disimpan.");
+    }
+  }
+
+  async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setModalError("");
+    setSaving(true);
+    try {
+      const user = await authApi.updateProfile({ name: profileName, email: profileEmail });
+      setCurrentUser(user);
+      setEditOpen(false);
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "Profil gagal diperbarui.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setModalError("");
+    if (newPassword !== confirmPassword) {
+      setModalError("Konfirmasi password baru tidak cocok.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await authApi.changePassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      window.location.href = "/login";
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "Password gagal diperbarui.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -131,10 +195,24 @@ function PengaturanPage() {
               </Badge>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button variant="outline" className="w-full rounded-full bg-card sm:w-auto">
+              <Button
+                variant="outline"
+                className="w-full rounded-full bg-card sm:w-auto"
+                onClick={() => {
+                  setModalError("");
+                  setEditOpen(true);
+                }}
+              >
                 Edit Profil
               </Button>
-              <Button variant="outline" className="w-full rounded-full bg-card sm:w-auto">
+              <Button
+                variant="outline"
+                className="w-full rounded-full bg-card sm:w-auto"
+                onClick={() => {
+                  setModalError("");
+                  setPasswordOpen(true);
+                }}
+              >
                 Ganti Password
               </Button>
             </div>
@@ -265,8 +343,110 @@ function PengaturanPage() {
                 Keluar dari Semua Perangkat
               </Button>
             </div>
+            {logoutError && <p className="text-xs font-semibold text-destructive">{logoutError}</p>}
           </section>
         </div>
+
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Edit Profil</DialogTitle>
+              <DialogDescription>Perbarui nama dan email akun pendamping.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="profile-name">Nama Lengkap</Label>
+                <Input
+                  id="profile-name"
+                  required
+                  minLength={2}
+                  value={profileName}
+                  onChange={(event) => setProfileName(event.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="profile-email">Email</Label>
+                <Input
+                  id="profile-email"
+                  type="email"
+                  required
+                  value={profileEmail}
+                  onChange={(event) => setProfileEmail(event.target.value)}
+                />
+              </div>
+              {modalError && <p className="text-sm font-semibold text-destructive">{modalError}</p>}
+              <DialogFooter>
+                <Button type="submit" disabled={saving} className="rounded-full">
+                  {saving && <Loader2 className="size-4 animate-spin" />}
+                  Simpan
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={passwordOpen}
+          onOpenChange={(open) => {
+            setPasswordOpen(open);
+            if (!open) {
+              setCurrentPassword("");
+              setNewPassword("");
+              setConfirmPassword("");
+              setModalError("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Ganti Password</DialogTitle>
+              <DialogDescription>
+                Masukkan password saat ini untuk mengamankan perubahan.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="current-password">Password Saat Ini</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="new-password">Password Baru</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="confirm-password">Konfirmasi Password Baru</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+              </div>
+              {modalError && <p className="text-sm font-semibold text-destructive">{modalError}</p>}
+              <DialogFooter>
+                <Button type="submit" disabled={saving} className="rounded-full">
+                  {saving && <Loader2 className="size-4 animate-spin" />}
+                  Ganti Password
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );

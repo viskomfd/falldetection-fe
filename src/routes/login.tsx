@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
-import { getElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -42,8 +41,8 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      await authApi.login({ email, password });
-      void navigate({ to: getElderlyName() ? "/dashboard" : "/setup-lansia" });
+      const { user } = await authApi.login({ email, password });
+      void navigate({ to: user.elderly_name ? "/dashboard" : "/setup-lansia" });
     } catch (err) {
       setErrorMessage(
         err instanceof Error

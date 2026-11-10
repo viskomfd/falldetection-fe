@@ -28,10 +28,10 @@ function SetupLansiaPage() {
     setAuthChecked(true);
   }, [navigate]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      saveElderlyName(name);
+      await saveElderlyName(name);
       void navigate({ to: "/dashboard" });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Nama lansia gagal disimpan.");

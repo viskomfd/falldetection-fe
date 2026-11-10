@@ -1,25 +1,19 @@
 import { useEffect, useState } from "react";
 
-import { getUser } from "@/lib/api";
+import { authApi, getUser } from "@/lib/api";
 
 const ELDERLY_CHANGED_EVENT = "rumi:elderly-changed";
 
-function getStorageKey(): string {
-  const user = getUser();
-  return user?.id ? `rumi-elderly-name_${user.id}` : "rumi-elderly-name_guest";
-}
-
 export function getElderlyName(): string {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(getStorageKey())?.trim() ?? "";
+  return getUser()?.elderly_name?.trim() ?? "";
 }
 
-export function saveElderlyName(name: string): void {
-  if (typeof window === "undefined") return;
+export async function saveElderlyName(name: string): Promise<string> {
   const normalizedName = name.trim();
   if (!normalizedName) throw new Error("Nama lansia harus diisi.");
-  window.localStorage.setItem(getStorageKey(), normalizedName);
-  window.dispatchEvent(new Event(ELDERLY_CHANGED_EVENT));
+  const user = await authApi.updateProfile({ elderly_name: normalizedName });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(ELDERLY_CHANGED_EVENT));
+  return user.elderly_name ?? normalizedName;
 }
 
 export function useElderlyName(): string {

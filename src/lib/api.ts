@@ -1,9 +1,9 @@
 // Centralized API Client for Rumi Frontend
 
 export const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8000";
+  (import.meta.env["VITE_API_BASE_URL"] as string) || "http://localhost:8000";
 export const WS_BASE_URL =
-  (import.meta.env.VITE_WS_URL as string) || "ws://localhost:8000/ws/alerts";
+  (import.meta.env["VITE_WS_URL"] as string) || "ws://localhost:8000/ws/alerts";
 
 // ========================
 // TYPES & INTERFACES
@@ -15,6 +15,7 @@ export interface User {
   email: string;
   role: string;
   avatar_initials: string;
+  elderly_name?: string | null;
   created_at?: string;
 }
 
@@ -117,10 +118,7 @@ export function resolveMediaUrl(path?: string | null): string {
 // CORE FETCH CLIENT
 // ========================
 
-export async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
@@ -199,6 +197,32 @@ export const authApi = {
     return user;
   },
 
+  async updateProfile(data: {
+    name?: string;
+    email?: string;
+    elderly_name?: string;
+  }): Promise<User> {
+    const user = await apiRequest<User>("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    setUser(user);
+    return user;
+  },
+
+  async changePassword(data: { current_password: string; new_password: string }): Promise<void> {
+    await apiRequest("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    clearSession();
+  },
+
+  async logoutAll(): Promise<void> {
+    await apiRequest("/api/auth/logout-all", { method: "POST" });
+    clearSession();
+  },
+
   logout(): void {
     clearSession();
     if (typeof window !== "undefined") {
@@ -264,10 +288,9 @@ export const modelApi = {
     return apiRequest("/api/model/status");
   },
 
-  async simulateFall(): Promise<any> {
+  async simulateFall(): Promise<unknown> {
     return apiRequest("/api/model/simulate-fall", {
       method: "POST",
     });
   },
 };
-

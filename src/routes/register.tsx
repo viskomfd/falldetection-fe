@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
-import { getElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -45,8 +44,8 @@ function RegisterPage() {
     setLoading(true);
 
     try {
-      await authApi.register({ name, email, password });
-      void navigate({ to: getElderlyName() ? "/dashboard" : "/setup-lansia" });
+      const { user } = await authApi.register({ name, email, password });
+      void navigate({ to: user.elderly_name ? "/dashboard" : "/setup-lansia" });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Pendaftaran gagal. Silakan coba lagi.");
     } finally {
