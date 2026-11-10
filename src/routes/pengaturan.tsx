@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Cctv, HeartHandshake, Loader2, Lock, Mail, Smartphone } from "lucide-react";
+import { BellRing, Cctv, HeartHandshake, Loader2, Lock, Mail, Smartphone } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -88,6 +88,8 @@ function PengaturanPage() {
     getNotificationPreferences(),
   );
   const [notificationError, setNotificationError] = useState("");
+  const [testingNotification, setTestingNotification] = useState(false);
+  const [notificationTestStatus, setNotificationTestStatus] = useState("");
 
   useEffect(() => {
     authApi
@@ -162,6 +164,12 @@ function PengaturanPage() {
 
   async function handleNotificationChange(id: keyof NotificationPreferences, checked: boolean) {
     setNotificationError("");
+    if (id === "desktop" && checked && !window.isSecureContext) {
+      setNotificationError(
+        "Notifikasi sistem memerlukan HTTPS. Alamat HTTP melalui IP lokal tidak dapat meminta izin browser.",
+      );
+      return;
+    }
     if (id === "desktop" && checked && !(await requestDesktopNotificationPermission())) {
       setNotificationError("Izin notifikasi browser ditolak. Aktifkan melalui pengaturan browser.");
       return;
@@ -170,6 +178,21 @@ function PengaturanPage() {
     const next = { ...notificationPreferences, [id]: checked };
     setNotificationPreferences(next);
     saveNotificationPreferences(next);
+  }
+
+  async function handleTestNotification() {
+    setTestingNotification(true);
+    setNotificationTestStatus("");
+    try {
+      const result = await authApi.testNotification();
+      setNotificationTestStatus(result.message);
+    } catch (error) {
+      setNotificationTestStatus(
+        error instanceof Error ? error.message : "Notifikasi uji gagal dikirim.",
+      );
+    } finally {
+      setTestingNotification(false);
+    }
   }
 
   const name = currentUser?.name || "Andi Pratama";
@@ -298,6 +321,30 @@ function PengaturanPage() {
             {notificationError && (
               <p className="text-xs font-semibold text-destructive">{notificationError}</p>
             )}
+            <div className="border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                disabled={testingNotification}
+                onClick={() => void handleTestNotification()}
+              >
+                {testingNotification ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <BellRing className="size-4" />
+                )}
+                {testingNotification ? "Mengirim..." : "Kirim Test Fall Alert"}
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Dikirim ke perangkat yang sedang membuka Rumi dengan akun yang sama.
+              </p>
+              {notificationTestStatus && (
+                <p role="status" className="mt-2 text-xs font-semibold text-primary">
+                  {notificationTestStatus}
+                </p>
+              )}
+            </div>
           </section>
 
           {/* Protocols */}

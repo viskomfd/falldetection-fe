@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, BrainCircuit, Loader2, Siren } from "lucide-react";
+import { ArrowLeft, BrainCircuit, Eye, EyeOff, Loader2, Siren } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
@@ -35,6 +35,7 @@ function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -135,17 +136,27 @@ function RegisterPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="password">Kata Sandi</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  placeholder="Minimal 8 karakter"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="rounded-2xl bg-background px-4 py-6"
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    placeholder="Minimal 8 karakter"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="rounded-2xl bg-background px-4 py-6 pr-12"
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                  </button>
+                </div>
               </div>
               <Button
                 type="submit"

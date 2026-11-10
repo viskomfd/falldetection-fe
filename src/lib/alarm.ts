@@ -35,18 +35,22 @@ export function showDesktopNotification(title: string, body: string): void {
   if (typeof window === "undefined" || !("Notification" in window)) return;
 
   if (Notification.permission === "granted") {
-    try {
-      new Notification(title, {
-        body,
-        icon: "/favicon.ico",
-      });
-    } catch {
-      // ignore
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker
+        .register("/notification-sw.js")
+        .then((registration) => registration.showNotification(title, { body, icon: "/icon.png" }))
+        .catch(() => undefined);
+    } else {
+      try {
+        new Notification(title, { body, icon: "/icon.png" });
+      } catch {
+        // Browser does not support direct notifications.
+      }
     }
   } else if (Notification.permission === "default") {
     void Notification.requestPermission().then((perm) => {
       if (perm === "granted") {
-        new Notification(title, { body, icon: "/favicon.ico" });
+        showDesktopNotification(title, body);
       }
     });
   }
@@ -54,7 +58,16 @@ export function showDesktopNotification(title: string, body: string): void {
 
 export async function requestDesktopNotificationPermission(): Promise<boolean> {
   if (typeof window === "undefined" || !("Notification" in window)) return false;
-  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "granted") {
+    if ("serviceWorker" in navigator) {
+      await navigator.serviceWorker.register("/notification-sw.js").catch(() => undefined);
+    }
+    return true;
+  }
   if (Notification.permission === "denied") return false;
-  return (await Notification.requestPermission()) === "granted";
+  const granted = (await Notification.requestPermission()) === "granted";
+  if (granted && "serviceWorker" in navigator) {
+    await navigator.serviceWorker.register("/notification-sw.js").catch(() => undefined);
+  }
+  return granted;
 }

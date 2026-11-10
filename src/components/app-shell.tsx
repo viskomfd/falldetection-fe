@@ -96,6 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ws = new WebSocket(WS_BASE_URL);
 
       ws.onopen = () => {
+        ws?.send(JSON.stringify({ type: "AUTH", token: getToken() }));
         heartbeatTimer = window.setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send("PING");
@@ -217,7 +218,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <header
-          className={`${pathname === "/dashboard" ? "flex" : "hidden lg:flex"} items-center justify-between gap-3 px-1 pb-4 sm:px-2 sm:pb-6 lg:pt-1`}
+          className={`${pathname === "/dashboard" ? "flex" : "hidden"} items-center justify-between gap-3 px-1 pb-4 sm:px-2 sm:pb-6 lg:pt-1`}
         >
           <div className="min-w-0">
             <h1 className="truncate text-xl font-extrabold text-foreground sm:text-2xl">

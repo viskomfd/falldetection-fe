@@ -14,7 +14,12 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 export function getNotificationPreferences(): NotificationPreferences {
   if (typeof window === "undefined") return DEFAULT_PREFERENCES;
   try {
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") };
+    const stored = {
+      ...DEFAULT_PREFERENCES,
+      ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}"),
+    };
+    const desktopAllowed = "Notification" in window && window.Notification.permission === "granted";
+    return { ...stored, desktop: stored.desktop && desktopAllowed };
   } catch {
     return DEFAULT_PREFERENCES;
   }

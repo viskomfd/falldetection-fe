@@ -13,6 +13,6 @@ describe("notification preferences", () => {
 
     saveNotificationPreferences({ popup: false, sound: false, desktop: true });
 
-    expect(getNotificationPreferences()).toEqual({ popup: false, sound: false, desktop: true });
+    expect(getNotificationPreferences()).toEqual({ popup: false, sound: false, desktop: false });
   });
 });

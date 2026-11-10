@@ -224,6 +224,10 @@ export const authApi = {
     clearSession();
   },
 
+  async testNotification(): Promise<{ message: string }> {
+    return apiRequest<{ message: string }>("/api/auth/test-notification", { method: "POST" });
+  },
+
   logout(): void {
     clearSession();
     if (typeof window !== "undefined") {
