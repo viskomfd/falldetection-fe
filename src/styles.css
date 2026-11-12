@@ -229,18 +229,6 @@
   transform: perspective(900px) rotateY(-12deg) rotateZ(2deg);
 }
 
-.rumi-scan-beam {
-  position: absolute;
-  z-index: 35;
-  top: 48%;
-  left: 50%;
-  width: min(70%, 700px);
-  height: 1px;
-  transform: translateX(-50%);
-  background: linear-gradient(90deg, transparent, #0d7166, transparent);
-  box-shadow: 0 0 18px 3px rgb(13 113 102 / 18%);
-}
-
 .rumi-demo-frame {
   box-shadow: 0 40px 100px -45px rgb(13 113 102 / 28%);
 }
@@ -284,10 +272,6 @@
     animation: rumi-phone-right 900ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  .rumi-scan-beam {
-    animation: rumi-scan 3.6s ease-in-out infinite;
-  }
-
   @keyframes rumi-arrive {
     from {
       opacity: 0;
@@ -320,18 +304,6 @@
       transform: perspective(900px) rotateY(-12deg) rotateZ(2deg) translateX(0);
     }
   }
-
-  @keyframes rumi-scan {
-    0%,
-    100% {
-      opacity: 0.25;
-      transform: translate(-50%, -3rem) scaleX(0.72);
-    }
-    50% {
-      opacity: 1;
-      transform: translate(-50%, 3rem) scaleX(1);
-    }
-  }
 }
 
 @media (max-width: 767px) {
@@ -351,11 +323,6 @@
 
   .rumi-phone-right {
     right: -1rem;
-  }
-
-  .rumi-scan-beam {
-    top: 56%;
-    width: 82%;
   }
 }
 
