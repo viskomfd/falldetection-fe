@@ -26,6 +26,7 @@ import feedLivingRoom from "@/assets/feed-living-room.jpg";
 import fallSnapshot from "@/assets/fall-snapshot.jpg";
 import landingCameraPhone from "@/assets/landing-camera-phone.png";
 import landingDashboardTablet from "@/assets/landing-dashboard-tablet.png";
+import landingFallDetection from "@/assets/landing-fall-detection.png";
 import landingSettingsPhone from "@/assets/landing-settings-phone.png";
 import { BrandLogo } from "@/components/brand-logo";
 import {
@@ -155,8 +156,8 @@ function Landing() {
             <BrandLogo imageClassName="size-9" textClassName="text-[#0d7166]" />
           </a>
           <div className="hidden items-center gap-8 text-xs font-semibold text-[#55736d] md:flex">
-            <a href="#demo" className="transition-colors hover:text-[#0d7166]">
-              Demo
+            <a href="#simulasi" className="transition-colors hover:text-[#0d7166]">
+              Simulasi
             </a>
             <a href="#fitur" className="transition-colors hover:text-[#0d7166]">
               Fitur
@@ -210,7 +211,7 @@ function Landing() {
                 size="lg"
                 className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-lg shadow-[#0d7166]/15 hover:bg-[#095e55]"
               >
-                <a href="#demo">
+                <a href="#simulasi">
                   <Play className="size-4 fill-current" /> Lihat simulasi
                 </a>
               </Button>
@@ -265,7 +266,7 @@ function Landing() {
           </div>
         </section>
 
-        <section id="demo" className="relative scroll-mt-24 px-4 py-28 lg:py-36">
+        <section id="simulasi" className="relative scroll-mt-24 px-4 py-28 lg:py-36">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto max-w-3xl text-center">
               <SectionLabel>Simulasi yang transparan</SectionLabel>
@@ -278,7 +279,7 @@ function Landing() {
               </p>
             </div>
 
-            <div className="rumi-demo-frame relative mx-auto mt-16 max-w-5xl overflow-hidden rounded-[2rem] border border-[#cfe3dd] bg-white p-2 sm:p-3">
+            <div className="rumi-simulation-frame relative mx-auto mt-16 max-w-5xl overflow-hidden rounded-[2rem] border border-[#cfe3dd] bg-white p-2 sm:p-3">
               <div className="relative overflow-hidden rounded-[1.4rem]">
                 <img
                   src={feedLivingRoom}
@@ -425,8 +426,8 @@ function Landing() {
               </div>
               <div className="order-1 overflow-hidden rounded-[2rem] border border-[#d3e6e0] bg-[#e8f7f2] p-3 lg:order-2">
                 <img
-                  src={fallSnapshot}
-                  alt="Snapshot contoh indikasi jatuh"
+                  src={landingFallDetection}
+                  alt="Deteksi jatuh dengan pose estimation dari kamera CCTV"
                   className="aspect-[4/3] w-full rounded-[1.4rem] object-cover"
                 />
               </div>
@@ -493,7 +494,7 @@ function Landing() {
                   className="mt-8 rounded-full border-[#c9dfd9] bg-white px-6 text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
                 >
                   <Link to="/riwayat">
-                    Buka riwayat demo <ChevronRight className="size-4" />
+                    Buka riwayat <ChevronRight className="size-4" />
                   </Link>
                 </Button>
               </div>
@@ -624,7 +625,7 @@ function Landing() {
                   variant="outline"
                   className="rounded-full border-[#bfd8d1] bg-white/65 px-7 font-bold text-[#0a3934] hover:bg-white hover:text-[#0d7166]"
                 >
-                  <Link to="/register">Buat akun demo</Link>
+                  <Link to="/register">Buat akun</Link>
                 </Button>
               </div>
               <div className="mt-7 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-[#63807a]">

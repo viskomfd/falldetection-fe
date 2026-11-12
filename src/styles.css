@@ -229,7 +229,7 @@
   transform: perspective(900px) rotateY(-12deg) rotateZ(2deg);
 }
 
-.rumi-demo-frame {
+.rumi-simulation-frame {
   box-shadow: 0 40px 100px -45px rgb(13 113 102 / 28%);
 }
 
