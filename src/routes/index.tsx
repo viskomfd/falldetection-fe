@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   Siren,
   Video,
-  Wifi,
 } from "lucide-react";
 
 import feedBedroom from "@/assets/feed-bedroom.jpg";
@@ -27,6 +26,7 @@ import fallSnapshot from "@/assets/fall-snapshot.jpg";
 import landingCameraPhone from "@/assets/landing-camera-phone.png";
 import landingDashboardTablet from "@/assets/landing-dashboard-tablet.png";
 import landingFallDetection from "@/assets/landing-fall-detection.png";
+import landingFallSimulation from "@/assets/landing-fall-simulation.mp4";
 import landingSettingsPhone from "@/assets/landing-settings-phone.png";
 import { BrandLogo } from "@/components/brand-logo";
 import {
@@ -280,39 +280,17 @@ function Landing() {
             </div>
 
             <div className="rumi-simulation-frame relative mx-auto mt-16 max-w-5xl overflow-hidden rounded-[2rem] border border-[#cfe3dd] bg-white p-2 sm:p-3">
-              <div className="relative overflow-hidden rounded-[1.4rem]">
-                <img
-                  src={feedLivingRoom}
-                  alt="Simulasi kamera ruang keluarga"
-                  className="aspect-video w-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-black/25" />
-                <div className="rumi-detection-zone absolute bottom-[20%] right-[19%] h-[42%] w-[17%] rounded-xl border border-[#91f0d1]/70">
-                  <span className="absolute -top-6 left-0 rounded-md bg-[#91f0d1] px-2 py-1 text-[8px] font-extrabold text-[#052e29]">
-                    Gerakan · 87%
-                  </span>
-                </div>
-                <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-[10px] font-bold backdrop-blur">
-                  <span className="size-2 animate-pulse rounded-full bg-[#ff665d]" /> Live · Ruang
-                  keluarga
-                </div>
-                <button
-                  aria-label="Putar simulasi deteksi jatuh"
-                  className="absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-transform hover:scale-105"
-                >
-                  <Play className="ml-1 size-6 fill-current" />
-                </button>
-                <div className="absolute inset-x-5 bottom-4 flex items-end justify-between">
-                  <div>
-                    <p className="text-sm font-bold">Simulasi pemantauan</p>
-                    <p className="mt-1 text-[10px] text-white/50">Ruang keluarga · Cam 01</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Wifi className="size-4" />
-                    <Expand className="size-4" />
-                  </div>
-                </div>
-              </div>
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                poster={landingFallDetection}
+                className="aspect-video w-full rounded-[1.4rem] bg-black object-cover"
+                aria-label="Video simulasi deteksi jatuh Rumi"
+              >
+                <source src={landingFallSimulation} type="video/mp4" />
+                Browser Anda tidak mendukung pemutar video.
+              </video>
             </div>
           </div>
         </section>
