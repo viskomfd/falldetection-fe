@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, ChevronDown, Loader2, Play } from "lucide-react";
+import { CalendarDays, ChevronDown, ExternalLink, Loader2, Play, ZoomIn } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -68,6 +68,7 @@ function RiwayatPage() {
   const [dateFilter, setDateFilter] = useState("7");
   const [locationFilter, setLocationFilter] = useState("all");
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [previewSnapshot, setPreviewSnapshot] = useState<Incident | null>(null);
 
   async function loadIncidents() {
     try {
@@ -196,23 +197,39 @@ function RiwayatPage() {
                         className="grid grid-cols-[5rem_1fr] gap-x-4 border-b border-border px-4 py-4 last:border-0 md:table-row md:px-0 md:py-0"
                       >
                         <td className="row-span-4 py-1 md:table-cell md:px-5 md:py-3">
-                          <div className="relative flex h-12 w-20 items-center justify-center overflow-hidden rounded-xl bg-muted px-1 text-center text-[10px] text-muted-foreground">
+                          <button
+                            type="button"
+                            onClick={() => imageSrc && setPreviewSnapshot(incident)}
+                            disabled={!imageSrc}
+                            title={
+                              imageSrc
+                                ? "Klik untuk melihat foto bukti snapshot resolusi penuh"
+                                : "Bukti tidak tersedia"
+                            }
+                            className="group relative flex h-12 w-20 items-center justify-center overflow-hidden rounded-xl bg-muted text-center text-[10px] text-muted-foreground transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:pointer-events-none disabled:opacity-60"
+                          >
                             Bukti tidak tersedia
                             {imageSrc && (
-                              <img
-                                src={imageSrc}
-                                alt={`Snapshot insiden ${incident.camera_name || incident.location}`}
-                                width={1280}
-                                height={720}
-                                loading="lazy"
-                                onError={(event) => {
-                                  event.currentTarget.style.display = "none";
-                                }}
-                                className="absolute inset-0 size-full object-cover"
-                              />
+                              <>
+                                <img
+                                  src={imageSrc}
+                                  alt={`Snapshot insiden ${incident.camera_name || incident.location}`}
+                                  width={1280}
+                                  height={720}
+                                  loading="lazy"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = "none";
+                                  }}
+                                  className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-110"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                                  <ZoomIn className="size-4 text-white drop-shadow" />
+                                </div>
+                              </>
                             )}
-                          </div>
+                          </button>
                         </td>
+
                         <td
                           data-label="Waktu"
                           className="flex min-w-0 items-start justify-between gap-3 py-1 font-semibold text-foreground before:text-xs before:font-medium before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:px-5 md:py-3 md:before:hidden"
@@ -294,6 +311,62 @@ function RiwayatPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Modal Preview Screenshot / Snapshot Bukti */}
+        <Dialog
+          open={Boolean(previewSnapshot)}
+          onOpenChange={(open) => {
+            if (!open) setPreviewSnapshot(null);
+          }}
+        >
+          <DialogContent className="max-w-4xl overflow-hidden rounded-3xl p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold">Bukti Snapshot Deteksi Jatuh</DialogTitle>
+              <DialogDescription className="text-sm">
+                {previewSnapshot?.camera_name || previewSnapshot?.location} ·{" "}
+                {formatIncidentDate(previewSnapshot?.detected_at).dateStr} pukul{" "}
+                {formatIncidentDate(previewSnapshot?.detected_at).timeStr}
+                {previewSnapshot && (
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Lansia: {elderlyName || previewSnapshot.person_name || "Lansia"}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {previewSnapshot?.snapshot_url && (
+              <div className="mt-2 flex flex-col items-center">
+                <div className="relative flex max-h-[72vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-black/95">
+                  <img
+                    src={resolveMediaUrl(previewSnapshot.snapshot_url)}
+                    alt={`Bukti insiden ${previewSnapshot.camera_name || previewSnapshot.location}`}
+                    className="max-h-[70vh] w-full object-contain"
+                  />
+                </div>
+                <div className="mt-4 flex w-full flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>Snapshot otomatis tersimpan saat indikasi jatuh terkonfirmasi oleh model AI.</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full bg-card gap-1.5"
+                    asChild
+                  >
+                    <a
+                      href={resolveMediaUrl(previewSnapshot.snapshot_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink className="size-3.5" />
+                      Buka Ukuran Asli
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
       </div>
     </AppShell>
   );
