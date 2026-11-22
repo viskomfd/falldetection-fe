@@ -125,6 +125,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
   const headers = new Headers(options.headers || {});
+  headers.set("ngrok-skip-browser-warning", "true");
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }

@@ -16,21 +16,21 @@ export function CameraStream({
   cameraId,
   name,
   url,
-  protocol,
+  protocol: _protocol,
   className,
 }: CameraStreamProps) {
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Jika protokol RTSP, alirkan melalui proxy gateway backend (/api/cameras/{id}/stream)
-  // agar browser dapat memutar frame video langsung via tag <img> tanpa perlu plugin tambahan
-  const basePlaybackUrl =
-    protocol === "RTSP" && cameraId
-      ? `${API_BASE_URL}/api/cameras/${cameraId}/stream`
-      : normalizeCameraUrl(url);
+  // Alirkan seluruh kamera terdaftar via backend proxy agar diproses oleh model YOLO11
+  // (menampilkan bounding box & pose skeleton)
+  const isBackendStream = Boolean(cameraId);
+  const basePlaybackUrl = isBackendStream
+    ? `${API_BASE_URL}/api/cameras/${cameraId}/stream`
+    : normalizeCameraUrl(url);
 
   const playbackUrl =
-    protocol === "RTSP" && reloadKey > 0
+    isBackendStream && reloadKey > 0
       ? `${basePlaybackUrl}?t=${reloadKey}`
       : basePlaybackUrl;
 
