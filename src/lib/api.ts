@@ -25,7 +25,7 @@ export interface AuthResponse {
   user: User;
 }
 
-export type CameraProtocol = "HTTP" | "RTSP";
+export type CameraProtocol = "HTTP" | "RTSP" | "DEVICE";
 
 export interface Camera {
   id: string;
@@ -273,6 +273,23 @@ export const incidentApi = {
     return apiRequest<Incident>("/api/incidents", {
       method: "POST",
       body: JSON.stringify(incident),
+    });
+  },
+
+  async reportOnDeviceAlert(formData: FormData): Promise<Incident> {
+    return apiRequest<Incident>("/api/incidents/on-device-alert", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  async uploadIncidentClip(
+    incidentId: string,
+    formData: FormData,
+  ): Promise<{ status: string; incident_id: string; clip_url: string; clip_duration: string }> {
+    return apiRequest(`/api/incidents/${incidentId}/clip`, {
+      method: "POST",
+      body: formData,
     });
   },
 };
