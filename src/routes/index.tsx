@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   BellRing,
   Camera,
@@ -30,6 +30,10 @@ import landingFallSimulation from "@/assets/landing-fall-simulation.mp4";
 import landingSettingsPhone from "@/assets/landing-settings-phone.png";
 import { BrandLogo } from "@/components/brand-logo";
 import { HeroIsometricHome } from "@/components/hero-isometric-home";
+
+const Hero3DScene = lazy(() =>
+  import("@/components/hero-3d-scene").then((mod) => ({ default: mod.Hero3DScene })),
+);
 import {
   Accordion,
   AccordionContent,
@@ -104,6 +108,15 @@ function Landing() {
   const { isInstalled, triggerInstall } = usePwaInstall();
   const [iosGuideOpen, setIosGuideOpen] = useState(false);
   const [installHint, setInstallHint] = useState("");
+  const [isDesktopHero, setIsDesktopHero] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktopHero(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   async function handleInstallPwa() {
     setInstallHint("");
@@ -218,93 +231,149 @@ function Landing() {
       </header>
 
       <main>
-        {/* 1. FULL-VIEWPORT SPLIT HERO WITH ANIMATED ISOMETRIC HOME */}
-        <section
-          id="beranda"
-          className="rumi-night-hero relative flex min-h-dvh flex-col justify-between px-4 pb-6 pt-24 lg:pb-8 lg:pt-28"
-        >
-          <div className="relative z-10 mx-auto my-auto grid w-full max-w-6xl items-center gap-8 py-4 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
-            <div className="text-center lg:text-left">
-              <h1 className="text-[2.15rem] leading-[1.06] font-bold tracking-[-0.04em] sm:text-5xl lg:text-[3.15rem]">
-                <span className="block">Deteksi jatuh nyata</span>
-                <span className="block text-[#0d7166] lg:whitespace-nowrap">
-                  Lewat CCTV atau kamera HP
-                </span>
-              </h1>
-              <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-[#335952] sm:text-lg lg:mx-0">
-                Pantau keselamatan lansia di rumah lewat CCTV atau kamera perangkat, dan terima
-                notifikasi jatuh dari satu dashboard.
-              </p>
-              <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
-                <Button
-                  asChild
-                  size="lg"
-                  className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-md shadow-[#0d7166]/15 hover:bg-[#095e55]"
-                >
-                  <a href="#simulasi">
-                    <Play className="size-4 fill-current" /> Lihat simulasi
-                  </a>
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="rounded-full border-[#c9dfd9] bg-white px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
-                >
-                  <Link to="/login">Coba Rumi</Link>
-                </Button>
-                {!isInstalled && (
+        {/* 1. HERO — FULL-BLEED LOW-POLY SCENE ON DESKTOP, UNCHANGED ON MOBILE */}
+        <section id="beranda" className="rumi-night-hero relative min-h-dvh overflow-hidden">
+          {/* Desktop (lg+): Full-bleed 3D low-poly living room with Sitting -> Walk -> Fall animation */}
+          <div className="relative hidden min-h-dvh items-center lg:flex">
+            {isDesktopHero && (
+              <Suspense fallback={<div className="absolute inset-0 bg-[#f3f8f6]" />}>
+                <Hero3DScene />
+              </Suspense>
+            )}
+            <div className="relative z-20 mx-auto w-full max-w-6xl px-4 py-24">
+              <div className="max-w-xl text-left">
+                <h1 className="text-[3.05rem] leading-[1.06] font-bold tracking-[-0.04em] text-[#0a3934]">
+                  <span className="block">Deteksi jatuh nyata</span>
+                  <span className="block whitespace-nowrap text-[#0d7166]">
+                    Lewat CCTV atau kamera HP
+                  </span>
+                </h1>
+                <p className="mt-5 max-w-md text-lg leading-7 text-[#264b44]">
+                  Pantau keselamatan lansia di rumah lewat CCTV atau kamera perangkat, dan terima
+                  notifikasi jatuh dari satu dashboard.
+                </p>
+                <div className="mt-7 flex flex-wrap gap-3">
                   <Button
-                    type="button"
+                    asChild
+                    size="lg"
+                    className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-md shadow-[#0d7166]/15 hover:bg-[#095e55]"
+                  >
+                    <a href="#simulasi">
+                      <Play className="size-4 fill-current" /> Lihat simulasi
+                    </a>
+                  </Button>
+                  <Button
+                    asChild
                     size="lg"
                     variant="outline"
-                    onClick={() => void handleInstallPwa()}
-                    className="rounded-full border-[#0d7166]/35 bg-[#e8f7f2] px-6 font-bold text-[#0d7166] hover:bg-[#d5efe6]"
+                    className="rounded-full border-[#c9dfd9] bg-white/95 px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
                   >
-                    <Download className="size-4" /> Install Aplikasi
+                    <Link to="/login">Coba Rumi</Link>
                   </Button>
+                  {!isInstalled && (
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      onClick={() => void handleInstallPwa()}
+                      className="rounded-full border-[#0d7166]/35 bg-[#e8f7f2]/95 px-6 font-bold text-[#0d7166] hover:bg-[#d5efe6]"
+                    >
+                      <Download className="size-4" /> Install Aplikasi
+                    </Button>
+                  )}
+                </div>
+                {installHint && (
+                  <p role="status" className="mt-3 max-w-md text-xs font-medium text-[#264b44]">
+                    {installHint}
+                  </p>
                 )}
               </div>
-              {installHint && (
-                <p
-                  role="status"
-                  className="mx-auto mt-3 max-w-lg text-xs font-medium text-[#335952] lg:mx-0"
-                >
-                  {installHint}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <HeroIsometricHome />
             </div>
           </div>
 
-          <div className="relative z-10 mx-auto mt-6 grid w-full max-w-6xl gap-3 sm:grid-cols-3">
-            {[
-              [
-                "CCTV & kamera HP",
-                "Gunakan IP camera rumah atau kamera perangkat langsung di browser",
-              ],
-              [
-                "Deteksi pose tubuh",
-                "Analisis pose YOLO11 untuk mengenali indikasi jatuh tanpa sensor tubuh",
-              ],
-              [
-                "Bukti & notifikasi",
-                "Snapshot, lokasi ruangan, alarm suara, dan klip singkat tersimpan rapi",
-              ],
-            ].map(([title, desc]) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-[#d8e9e4] bg-white/85 px-5 py-4 text-left"
-              >
-                <p className="font-display text-sm font-bold text-[#0d7166] sm:text-base">
-                  {title}
+          {/* Mobile & Tablet (< lg): Kept unchanged */}
+          <div className="relative z-10 flex min-h-dvh flex-col justify-between px-4 pb-6 pt-24 lg:hidden">
+            <div className="mx-auto my-auto grid w-full max-w-6xl items-center gap-8 py-4">
+              <div className="text-center">
+                <h1 className="text-[2.15rem] leading-[1.06] font-bold tracking-[-0.04em] sm:text-5xl">
+                  <span className="block">Deteksi jatuh nyata</span>
+                  <span className="block text-[#0d7166]">Lewat CCTV atau kamera HP</span>
+                </h1>
+                <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-[#335952] sm:text-lg">
+                  Pantau keselamatan lansia di rumah lewat CCTV atau kamera perangkat, dan terima
+                  notifikasi jatuh dari satu dashboard.
                 </p>
-                <p className="mt-1 text-xs leading-5 text-[#335952] sm:text-sm">{desc}</p>
+                <div className="mt-7 flex flex-wrap justify-center gap-3">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-md shadow-[#0d7166]/15 hover:bg-[#095e55]"
+                  >
+                    <a href="#simulasi">
+                      <Play className="size-4 fill-current" /> Lihat simulasi
+                    </a>
+                  </Button>
+                  <Button
+                    asChild
+                    size="lg"
+                    variant="outline"
+                    className="rounded-full border-[#c9dfd9] bg-white px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
+                  >
+                    <Link to="/login">Coba Rumi</Link>
+                  </Button>
+                  {!isInstalled && (
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      onClick={() => void handleInstallPwa()}
+                      className="rounded-full border-[#0d7166]/35 bg-[#e8f7f2] px-6 font-bold text-[#0d7166] hover:bg-[#d5efe6]"
+                    >
+                      <Download className="size-4" /> Install Aplikasi
+                    </Button>
+                  )}
+                </div>
+                {installHint && (
+                  <p
+                    role="status"
+                    className="mx-auto mt-3 max-w-lg text-xs font-medium text-[#335952]"
+                  >
+                    {installHint}
+                  </p>
+                )}
               </div>
-            ))}
+
+              <div>
+                <HeroIsometricHome />
+              </div>
+            </div>
+
+            <div className="mx-auto mt-6 grid w-full max-w-6xl gap-3 sm:grid-cols-3">
+              {[
+                [
+                  "CCTV & kamera HP",
+                  "Gunakan IP camera rumah atau kamera perangkat langsung di browser",
+                ],
+                [
+                  "Deteksi pose tubuh",
+                  "Analisis pose YOLO11 untuk mengenali indikasi jatuh tanpa sensor tubuh",
+                ],
+                [
+                  "Bukti & notifikasi",
+                  "Snapshot, lokasi ruangan, alarm suara, dan klip singkat tersimpan rapi",
+                ],
+              ].map(([title, desc]) => (
+                <div
+                  key={title}
+                  className="rounded-2xl border border-[#d8e9e4] bg-white/85 px-5 py-4 text-left"
+                >
+                  <p className="font-display text-sm font-bold text-[#0d7166] sm:text-base">
+                    {title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#335952] sm:text-sm">{desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -848,11 +917,7 @@ function Landing() {
             </li>
           </ol>
           <DialogFooter>
-            <Button
-              type="button"
-              className="rounded-full"
-              onClick={() => setIosGuideOpen(false)}
-            >
+            <Button type="button" className="rounded-full" onClick={() => setIosGuideOpen(false)}>
               Mengerti
             </Button>
           </DialogFooter>

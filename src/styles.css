@@ -424,6 +424,306 @@
   animation: rumi-story-alert 8s var(--ease-out) infinite;
 }
 
+/* Synchronized 12s desktop low-poly hero story: Sit -> Stand (Bangun) -> Walk -> Fall -> Red Light & Alert */
+@keyframes rumi-lp-actor {
+  0%,
+  20% {
+    transform: translate(0px, 16px);
+    opacity: 1;
+  }
+  31% {
+    transform: translate(-36px, 18px);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(-235px, 24px);
+    opacity: 1;
+  }
+  91% {
+    transform: translate(-235px, 24px);
+    opacity: 1;
+  }
+  96% {
+    transform: translate(-235px, 24px);
+    opacity: 0;
+  }
+  97% {
+    transform: translate(0px, 16px);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(0px, 16px);
+    opacity: 1;
+  }
+}
+
+@keyframes rumi-lp-body {
+  0%,
+  20% {
+    transform: translateY(22px) rotate(0deg);
+  }
+  26% {
+    transform: translateY(10px) rotate(-10deg);
+  }
+  32%,
+  54% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  58% {
+    transform: translate(-10px, 2px) rotate(-22deg);
+  }
+  63%,
+  96% {
+    transform: translate(-28px, -10px) rotate(-84deg);
+  }
+  97%,
+  100% {
+    transform: translateY(22px) rotate(0deg);
+  }
+}
+
+@keyframes rumi-lp-leg-l {
+  0%,
+  20% {
+    transform: rotate(36deg) translate(-12px, -16px);
+  }
+  32%,
+  55%,
+  96% {
+    transform: rotate(0deg) translate(0px, 0px);
+  }
+  37%,
+  47% {
+    transform: rotate(18deg);
+  }
+  42%,
+  52% {
+    transform: rotate(-16deg);
+  }
+  97%,
+  100% {
+    transform: rotate(36deg) translate(-12px, -16px);
+  }
+}
+
+@keyframes rumi-lp-leg-r {
+  0%,
+  20% {
+    transform: rotate(32deg) translate(-10px, -16px);
+  }
+  32%,
+  55%,
+  96% {
+    transform: rotate(0deg) translate(0px, 0px);
+  }
+  37%,
+  47% {
+    transform: rotate(-16deg);
+  }
+  42%,
+  52% {
+    transform: rotate(18deg);
+  }
+  97%,
+  100% {
+    transform: rotate(32deg) translate(-10px, -16px);
+  }
+}
+
+@keyframes rumi-lp-cane {
+  0%,
+  20% {
+    transform: translate(-10px, 18px) rotate(-8deg);
+    opacity: 0.9;
+  }
+  32%,
+  37%,
+  47%,
+  54% {
+    transform: translate(-8px, 0px) rotate(4deg);
+    opacity: 1;
+  }
+  42%,
+  52% {
+    transform: translate(-16px, -4px) rotate(-10deg);
+    opacity: 1;
+  }
+  61%,
+  96% {
+    transform: translate(-86px, -6px) rotate(-94deg);
+    opacity: 1;
+  }
+  97%,
+  100% {
+    transform: translate(-10px, 18px) rotate(-8deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes rumi-lp-pose-box {
+  0%,
+  31% {
+    opacity: 0;
+    stroke: #0d7166;
+    transform: translate(0px, 0px) scale(1);
+  }
+  35%,
+  57% {
+    opacity: 0.9;
+    stroke: #0d7166;
+    transform: translate(0px, 0px) scale(1);
+  }
+  62%,
+  91% {
+    opacity: 1;
+    stroke: #d43d37;
+    transform: translate(-126px, 90px) scale(1.65, 0.44);
+  }
+  96%,
+  100% {
+    opacity: 0;
+    stroke: #0d7166;
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@keyframes rumi-lp-skeleton {
+  0%,
+  31% {
+    opacity: 0;
+    stroke: #34d399;
+    color: #0d7166;
+  }
+  35%,
+  57% {
+    opacity: 0.85;
+    stroke: #34d399;
+    color: #0d7166;
+  }
+  62%,
+  91% {
+    opacity: 1;
+    stroke: #f87171;
+    color: #d43d37;
+  }
+  96%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes rumi-lp-beam-white {
+  0%,
+  58% {
+    opacity: 1;
+  }
+  63%,
+  90% {
+    opacity: 0;
+  }
+  95%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes rumi-lp-beam-red {
+  0%,
+  58% {
+    opacity: 0;
+  }
+  63%,
+  90% {
+    opacity: 1;
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes rumi-lp-led {
+  0%,
+  58% {
+    fill: #5eead4;
+  }
+  63%,
+  90% {
+    fill: #ef4444;
+  }
+  95%,
+  100% {
+    fill: #5eead4;
+  }
+}
+
+@keyframes rumi-lp-alert {
+  0%,
+  61% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.94);
+  }
+  66%,
+  89% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+  }
+  94%,
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+
+.rumi-lp-actor {
+  animation: rumi-lp-actor 12s ease-in-out infinite;
+}
+
+.rumi-lp-body {
+  transform-origin: 0px 12px;
+  animation: rumi-lp-body 12s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.rumi-lp-leg-l {
+  transform-origin: -12px -92px;
+  animation: rumi-lp-leg-l 12s ease-in-out infinite;
+}
+
+.rumi-lp-leg-r {
+  transform-origin: 10px -92px;
+  animation: rumi-lp-leg-r 12s ease-in-out infinite;
+}
+
+.rumi-lp-cane {
+  transform-origin: -46px 12px;
+  animation: rumi-lp-cane 12s ease-in-out infinite;
+}
+
+.rumi-lp-pose-box {
+  transform-origin: 0px -95px;
+  animation: rumi-lp-pose-box 12s ease-out infinite;
+}
+
+.rumi-lp-skeleton {
+  animation: rumi-lp-skeleton 12s ease-out infinite;
+}
+
+.rumi-lp-beam-white {
+  animation: rumi-lp-beam-white 12s ease-in-out infinite;
+}
+
+.rumi-lp-beam-red {
+  animation: rumi-lp-beam-red 12s ease-in-out infinite;
+}
+
+.rumi-lp-led {
+  animation: rumi-lp-led 12s ease-in-out infinite;
+}
+
+.rumi-lp-alert {
+  animation: rumi-lp-alert 12s var(--ease-out) infinite;
+}
+
 .rumi-tab-enter {
   animation: rumi-tab-enter 220ms var(--ease-out) both;
 }
@@ -475,6 +775,57 @@
     animation: none;
     opacity: 1;
     transform: none;
+  }
+
+  .rumi-lp-actor {
+    animation: none;
+    transform: translate(-235px, 24px);
+  }
+
+  .rumi-lp-body {
+    animation: none;
+    transform: translate(-28px, -10px) rotate(-84deg);
+  }
+
+  .rumi-lp-leg-l,
+  .rumi-lp-leg-r {
+    animation: none;
+  }
+
+  .rumi-lp-cane {
+    animation: none;
+    transform: translate(-86px, -6px) rotate(-94deg);
+  }
+
+  .rumi-lp-pose-box {
+    animation: none;
+    opacity: 1;
+    stroke: #d43d37;
+    transform: translate(-126px, 90px) scale(1.65, 0.44);
+  }
+
+  .rumi-lp-skeleton {
+    animation: none;
+    opacity: 1;
+    stroke: #f87171;
+    color: #d43d37;
+  }
+
+  .rumi-lp-beam-white {
+    animation: none;
+    opacity: 0;
+  }
+
+  .rumi-lp-beam-red,
+  .rumi-lp-alert {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .rumi-lp-led {
+    animation: none;
+    fill: #ef4444;
   }
 
   .rumi-tab-enter {
