@@ -241,16 +241,187 @@
   }
 }
 
-.rumi-hero-tablet {
-  animation: rumi-hero-tablet 520ms var(--ease-out) both;
+@keyframes rumi-iso-stage {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.rumi-hero-phone-left {
-  animation: rumi-hero-phone-left 520ms 90ms var(--ease-out) both;
+/* Synchronized 8s hero fall-detection storytelling loop */
+@keyframes rumi-story-actor {
+  0% {
+    transform: translate(-22px, -11px);
+    opacity: 0;
+  }
+  6% {
+    transform: translate(-19px, -9.5px);
+    opacity: 1;
+  }
+  36% {
+    transform: translate(0px, 0px);
+    opacity: 1;
+  }
+  88% {
+    transform: translate(0px, 0px);
+    opacity: 1;
+  }
+  96%,
+  100% {
+    transform: translate(0px, 0px);
+    opacity: 0;
+  }
 }
 
-.rumi-hero-phone-right {
-  animation: rumi-hero-phone-right 520ms 90ms var(--ease-out) both;
+@keyframes rumi-story-body {
+  0%,
+  35% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  40% {
+    transform: translate(4px, -2px) rotate(16deg);
+  }
+  47%,
+  100% {
+    transform: translate(16px, 4px) rotate(84deg);
+  }
+}
+
+@keyframes rumi-story-leg-a {
+  0%,
+  18%,
+  36%,
+  100% {
+    transform: rotate(0deg);
+  }
+  9%,
+  27% {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes rumi-story-leg-b {
+  0%,
+  18%,
+  36%,
+  100% {
+    transform: rotate(0deg);
+  }
+  9%,
+  27% {
+    transform: rotate(-15deg);
+  }
+}
+
+@keyframes rumi-story-brackets {
+  0%,
+  44% {
+    stroke: #0d7166;
+    transform: translate(0px, 0px) scale(1);
+  }
+  48%,
+  88% {
+    stroke: #d43d37;
+    transform: translate(14px, 24px) scale(1.18, 0.62);
+  }
+  100% {
+    stroke: #0d7166;
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@keyframes rumi-story-skeleton {
+  0%,
+  44% {
+    stroke: #34d399;
+    color: #0d7166;
+  }
+  48%,
+  88% {
+    stroke: #f87171;
+    color: #d43d37;
+  }
+  100% {
+    stroke: #34d399;
+    color: #0d7166;
+  }
+}
+
+@keyframes rumi-story-cone-alert {
+  0%,
+  44% {
+    opacity: 0;
+  }
+  50%,
+  85% {
+    opacity: 1;
+  }
+  93%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes rumi-story-alert {
+  0%,
+  47% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.94);
+  }
+  53%,
+  85% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+  }
+  92%,
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+
+.rumi-iso-stage {
+  animation: rumi-iso-stage 560ms var(--ease-out) both;
+}
+
+.rumi-story-actor {
+  animation: rumi-story-actor 8s linear infinite;
+}
+
+.rumi-story-body {
+  transform-origin: 0px 0px;
+  animation: rumi-story-body 8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.rumi-story-leg-a {
+  transform-origin: -4px -24px;
+  animation: rumi-story-leg-a 8s ease-in-out infinite;
+}
+
+.rumi-story-leg-b {
+  transform-origin: 4px -24px;
+  animation: rumi-story-leg-b 8s ease-in-out infinite;
+}
+
+.rumi-story-brackets {
+  transform-origin: 0px -28px;
+  animation: rumi-story-brackets 8s ease-out infinite;
+}
+
+.rumi-story-skeleton {
+  animation: rumi-story-skeleton 8s ease-out infinite;
+}
+
+.rumi-story-cone-alert {
+  animation: rumi-story-cone-alert 8s ease-out infinite;
+}
+
+.rumi-story-alert {
+  animation: rumi-story-alert 8s var(--ease-out) infinite;
 }
 
 .rumi-tab-enter {
@@ -272,10 +443,38 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rumi-hero-tablet,
-  .rumi-hero-phone-left,
-  .rumi-hero-phone-right {
+  .rumi-iso-stage {
     animation: rumi-fade-only 200ms ease both;
+  }
+
+  .rumi-story-actor,
+  .rumi-story-leg-a,
+  .rumi-story-leg-b {
+    animation: none;
+  }
+
+  .rumi-story-body {
+    animation: none;
+    transform: translate(16px, 4px) rotate(84deg);
+  }
+
+  .rumi-story-brackets {
+    animation: none;
+    stroke: #d43d37;
+    transform: translate(14px, 24px) scale(1.18, 0.62);
+  }
+
+  .rumi-story-skeleton {
+    animation: none;
+    stroke: #f87171;
+    color: #d43d37;
+  }
+
+  .rumi-story-cone-alert,
+  .rumi-story-alert {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 
   .rumi-tab-enter {

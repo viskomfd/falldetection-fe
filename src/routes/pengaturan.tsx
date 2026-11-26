@@ -10,7 +10,6 @@ import {
   Mail,
   RotateCcw,
   Share,
-  Siren,
   Smartphone,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
@@ -89,7 +88,7 @@ const NOTIFICATIONS = [
   {
     id: "desktop",
     title: "Notifikasi Push / Desktop (24/7)",
-    description: "Terima notifikasi sistem meski browser atau aplikasi PWA ditutup.",
+    description: "Terima notifikasi sistem meski browser atau aplikasi ditutup.",
   },
 ] satisfies Array<{
   id: keyof NotificationPreferences;
@@ -124,8 +123,6 @@ function PengaturanPage() {
   const [isPwaInstalled, setIsPwaInstalled] = useState(false);
   const [iosGuideOpen, setIosGuideOpen] = useState(false);
   const [pwaInstallHint, setPwaInstallHint] = useState("");
-  const [simulatingFall, setSimulatingFall] = useState(false);
-  const [simulateFallStatus, setSimulateFallStatus] = useState("");
   const [resettingTrackers, setResettingTrackers] = useState(false);
   const [resetTrackersStatus, setResetTrackersStatus] = useState("");
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
@@ -325,23 +322,6 @@ function PengaturanPage() {
     }
   }
 
-  async function handleSimulateFall() {
-    setSimulatingFall(true);
-    setSimulateFallStatus("");
-    try {
-      const result = (await modelApi.simulateFall()) as { message?: string } | null;
-      setSimulateFallStatus(
-        result?.message || "Simulasi kejadian jatuh berhasil dipicu.",
-      );
-    } catch (error) {
-      setSimulateFallStatus(
-        error instanceof Error ? error.message : "Simulasi kejadian jatuh gagal dipicu.",
-      );
-    } finally {
-      setSimulatingFall(false);
-    }
-  }
-
   async function handleResetTrackers() {
     setResettingTrackers(true);
     setResetTrackersStatus("");
@@ -349,9 +329,7 @@ function PengaturanPage() {
       const result = await modelApi.resetTrackers();
       setResetTrackersStatus(result.message || "Tracker AI berhasil direset.");
     } catch (error) {
-      setResetTrackersStatus(
-        error instanceof Error ? error.message : "Tracker AI gagal direset.",
-      );
+      setResetTrackersStatus(error instanceof Error ? error.message : "Tracker AI gagal direset.");
     } finally {
       setResettingTrackers(false);
     }
@@ -394,12 +372,13 @@ function PengaturanPage() {
               </Badge>
               <Badge
                 variant="secondary"
-                className={`rounded-full ${apiOnline === true
+                className={`rounded-full ${
+                  apiOnline === true
                     ? "bg-success/15 text-success"
                     : apiOnline === false
                       ? "bg-destructive/15 text-destructive"
                       : ""
-                  }`}
+                }`}
               >
                 {apiOnline === true
                   ? "Server Online"
@@ -410,16 +389,17 @@ function PengaturanPage() {
               <Badge
                 variant="secondary"
                 title={modelStatus?.message || modelStatus?.model_file}
-                className={`rounded-full ${modelStatus
+                className={`rounded-full ${
+                  modelStatus
                     ? modelStatus.is_model_loaded
                       ? "bg-success/15 text-success"
                       : "bg-destructive/15 text-destructive"
                     : ""
-                  }`}
+                }`}
               >
                 {modelStatus
                   ? modelStatus.is_model_loaded
-                    ? `Model AI Aktif${modelStatus.mode ? ` · ${modelStatus.mode}` : ""}`
+                    ? "Model AI Aktif"
                     : "Model AI Tidak Aktif"
                   : "Status AI Tidak Diketahui"}
               </Badge>
@@ -498,7 +478,7 @@ function PengaturanPage() {
             <div className="flex flex-col gap-2.5 rounded-2xl bg-muted p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-bold text-foreground">Aplikasi Notifikasi 24/7 (PWA)</p>
+                  <p className="text-sm font-bold text-foreground">Aplikasi Notifikasi 24/7</p>
                   <p className="text-xs text-muted-foreground">
                     Pasang Rumi di perangkat Anda agar alert tetap masuk meski browser ditutup.
                   </p>
@@ -506,7 +486,7 @@ function PengaturanPage() {
                 {isPwaInstalled && (
                   <Badge className="gap-1.5 rounded-full bg-success/15 text-success hover:bg-success/15">
                     <CheckCircle2 className="size-3.5" />
-                    PWA Terpasang ✓ · Notifikasi aktif meski app ditutup
+                    Aplikasi Terpasang · Notifikasi aktif meski ditutup
                   </Badge>
                 )}
               </div>
@@ -519,7 +499,7 @@ function PengaturanPage() {
                     onClick={() => void handleInstallPwa()}
                   >
                     <Download className="size-4" />
-                    Install PWA untuk Notifikasi 24/7
+                    Install App untuk Notifikasi 24/7
                   </Button>
                   {pwaInstallHint && (
                     <p role="status" className="text-xs text-muted-foreground">
@@ -547,47 +527,26 @@ function PengaturanPage() {
               <p className="text-xs font-semibold text-destructive">{notificationError}</p>
             )}
             <div className="border-t border-border pt-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full"
-                  disabled={testingNotification}
-                  onClick={() => void handleTestNotification()}
-                >
-                  {testingNotification ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <BellRing className="size-4" />
-                  )}
-                  {testingNotification ? "Mengirim..." : "Kirim Test Fall Alert"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={simulatingFall}
-                  onClick={() => void handleSimulateFall()}
-                >
-                  {simulatingFall ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Siren className="size-4" />
-                  )}
-                  {simulatingFall ? "Memicu..." : "Simulasi Kejadian Jatuh"}
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                disabled={testingNotification}
+                onClick={() => void handleTestNotification()}
+              >
+                {testingNotification ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <BellRing className="size-4" />
+                )}
+                {testingNotification ? "Mengirim..." : "Uji Notifikasi"}
+              </Button>
               <p className="mt-2 text-xs text-muted-foreground">
-                Kirim notifikasi uji atau picu simulasi penuh deteksi jatuh ke dashboard dan riwayat.
+                Kirim notifikasi percobaan ke perangkat ini untuk memastikan peringatan berfungsi.
               </p>
               {notificationTestStatus && (
                 <p role="status" className="mt-2 text-xs font-semibold text-primary">
                   {notificationTestStatus}
-                </p>
-              )}
-              {simulateFallStatus && (
-                <p role="status" className="mt-1 text-xs font-semibold text-destructive">
-                  {simulateFallStatus}
                 </p>
               )}
             </div>
@@ -628,7 +587,7 @@ function PengaturanPage() {
               ))}
             </ul>
             <p className="text-xs text-muted-foreground">
-              Frame extraction berjalan otomatis dan koneksi tersambung ulang sendiri saat terputus.
+              Pemrosesan video berjalan otomatis dan tersambung ulang saat koneksi terputus.
             </p>
             <div className="border-t border-border pt-4">
               <Button
@@ -643,10 +602,10 @@ function PengaturanPage() {
                 ) : (
                   <RotateCcw className="size-4" />
                 )}
-                {resettingTrackers ? "Mereset..." : "Reset Tracker AI"}
+                {resettingTrackers ? "Mereset..." : "Reset Deteksi AI"}
               </Button>
               <p className="mt-2 text-xs text-muted-foreground">
-                Atur ulang state pelacakan pose AI di server jika deteksi kamera RTSP/HTTP macet.
+                Atur ulang pelacakan AI jika deteksi kamera terasa macet.
               </p>
               {resetTrackersStatus && (
                 <p role="status" className="mt-2 text-xs font-semibold text-primary">
@@ -662,15 +621,11 @@ function PengaturanPage() {
             <ul className="flex flex-col gap-3 text-sm text-muted-foreground">
               <li className="flex items-start gap-3">
                 <Lock className="mt-0.5 size-4 text-primary" />
-                Password disimpan ter-hash (bcrypt/argon2), tidak pernah dikirim dalam teks polos.
-              </li>
-              <li className="flex items-start gap-3">
-                <Lock className="mt-0.5 size-4 text-primary" />
-                Komunikasi dashboard terenkripsi via HTTPS/WSS.
+                Koneksi dashboard Anda dilindungi dengan enkripsi.
               </li>
               <li className="flex items-start gap-3">
                 <Smartphone className="mt-0.5 size-4 text-primary" />
-                Sesi aktif: JWT Token tersimpan aman di browser Anda.
+                Sesi login Anda tersimpan aman di perangkat ini.
               </li>
             </ul>
             <div>
@@ -803,7 +758,11 @@ function PengaturanPage() {
                 </span>
                 <div>
                   <p className="font-semibold">
-                    Ketuk tombol <span className="inline-flex items-center gap-1 font-bold">Share <Share className="inline size-3.5" /></span> di bar Safari
+                    Ketuk tombol{" "}
+                    <span className="inline-flex items-center gap-1 font-bold">
+                      Share <Share className="inline size-3.5" />
+                    </span>{" "}
+                    di bar Safari
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Ikon kotak dengan panah ke atas di bagian bawah layar Safari.
@@ -826,11 +785,7 @@ function PengaturanPage() {
               </li>
             </ol>
             <DialogFooter>
-              <Button
-                type="button"
-                className="rounded-full"
-                onClick={() => setIosGuideOpen(false)}
-              >
+              <Button type="button" className="rounded-full" onClick={() => setIosGuideOpen(false)}>
                 Mengerti
               </Button>
             </DialogFooter>

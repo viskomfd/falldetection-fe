@@ -26,6 +26,7 @@ import landingFallDetection from "@/assets/landing-fall-detection.png";
 import landingFallSimulation from "@/assets/landing-fall-simulation.mp4";
 import landingSettingsPhone from "@/assets/landing-settings-phone.png";
 import { BrandLogo } from "@/components/brand-logo";
+import { HeroIsometricHome } from "@/components/hero-isometric-home";
 import {
   Accordion,
   AccordionContent,
@@ -190,77 +191,74 @@ function Landing() {
       </header>
 
       <main>
-        {/* 1. COMPACT HERO */}
+        {/* 1. FULL-VIEWPORT SPLIT HERO WITH ANIMATED ISOMETRIC HOME */}
         <section
           id="beranda"
-          className="rumi-night-hero relative px-4 pb-10 pt-24 sm:pb-12 sm:pt-28"
+          className="rumi-night-hero relative flex min-h-dvh flex-col justify-between px-4 pb-6 pt-24 lg:pb-8 lg:pt-28"
         >
-          <div className="relative z-10 mx-auto max-w-6xl text-center">
-            <h1 className="mx-auto max-w-4xl text-[2.15rem] leading-[1.02] font-bold tracking-[-0.045em] sm:text-5xl lg:text-[4.25rem]">
-              <span className="block">Deteksi jatuh nyata</span>
-              <span className="block text-[#0d7166]">Lewat CCTV atau kamera HP</span>
-            </h1>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[#335952] sm:text-lg">
-              Pantau lewat CCTV rumah atau kamera perangkat, dan terima notifikasi jatuh dari satu
-              dashboard.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button
-                asChild
-                size="lg"
-                className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-md shadow-[#0d7166]/15 hover:bg-[#095e55]"
-              >
-                <a href="#simulasi">
-                  <Play className="size-4 fill-current" /> Lihat simulasi
-                </a>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full border-[#c9dfd9] bg-white px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
-              >
-                <Link to="/login">Coba Rumi</Link>
-              </Button>
+          <div className="relative z-10 mx-auto my-auto grid w-full max-w-6xl items-center gap-8 py-4 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
+            <div className="text-center lg:text-left">
+              <h1 className="text-[2.15rem] leading-[1.06] font-bold tracking-[-0.04em] sm:text-5xl lg:text-[3.15rem]">
+                <span className="block">Deteksi jatuh nyata</span>
+                <span className="block text-[#0d7166] lg:whitespace-nowrap">
+                  Lewat CCTV atau kamera HP
+                </span>
+              </h1>
+              <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-[#335952] sm:text-lg lg:mx-0">
+                Pantau keselamatan lansia di rumah lewat CCTV atau kamera perangkat, dan terima
+                notifikasi jatuh dari satu dashboard.
+              </p>
+              <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
+                <Button
+                  asChild
+                  size="lg"
+                  className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-md shadow-[#0d7166]/15 hover:bg-[#095e55]"
+                >
+                  <a href="#simulasi">
+                    <Play className="size-4 fill-current" /> Lihat simulasi
+                  </a>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="rounded-full border-[#c9dfd9] bg-white px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
+                >
+                  <Link to="/login">Coba Rumi</Link>
+                </Button>
+              </div>
             </div>
 
-            <div className="rumi-device-stage relative mx-auto mt-10 h-[215px] max-w-4xl overflow-hidden sm:h-[340px] lg:h-[420px]">
-              <img
-                src={landingCameraPhone}
-                alt="Tampilan halaman kamera Rumi di ponsel"
-                width={720}
-                height={1440}
-                className="rumi-hero-phone-left absolute left-[2%] top-[16%] z-30 w-[23%] -rotate-6 drop-shadow-xl sm:left-[3%] sm:top-[12%] sm:w-[20%]"
-              />
-              <img
-                src={landingDashboardTablet}
-                alt="Tampilan dashboard Rumi di tablet"
-                width={1400}
-                height={980}
-                fetchPriority="high"
-                className="rumi-hero-tablet absolute left-1/2 top-[4%] z-20 w-[82%] max-w-[640px] -translate-x-1/2 drop-shadow-xl sm:w-[72%]"
-              />
-              <img
-                src={landingSettingsPhone}
-                alt="Tampilan halaman pengaturan Rumi di ponsel"
-                width={720}
-                height={1440}
-                className="rumi-hero-phone-right absolute right-[2%] top-[16%] z-30 w-[23%] rotate-6 drop-shadow-xl sm:right-[3%] sm:top-[12%] sm:w-[20%]"
-              />
+            <div>
+              <HeroIsometricHome />
             </div>
+          </div>
 
-            <div className="mx-auto mt-6 grid max-w-4xl gap-3 border-t border-[#d8e9e4] pt-6 text-left sm:grid-cols-3">
-              {[
-                ["Satu dashboard", "Kamera tersebar, konteks tetap utuh"],
-                ["Tanpa sensor tubuh", "Manfaatkan CCTV atau kamera HP"],
-                ["Bukti yang jelas", "Snapshot, waktu, dan lokasi kejadian"],
-              ].map(([title, text]) => (
-                <div key={title} className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="font-display text-base font-bold text-[#0d7166]">{title}</p>
-                  <p className="mt-0.5 text-sm text-[#335952]">{text}</p>
-                </div>
-              ))}
-            </div>
+          <div className="relative z-10 mx-auto mt-6 grid w-full max-w-6xl gap-3 sm:grid-cols-3">
+            {[
+              [
+                "CCTV & kamera HP",
+                "Gunakan IP camera rumah atau kamera perangkat langsung di browser",
+              ],
+              [
+                "Deteksi pose tubuh",
+                "Analisis pose YOLO11 untuk mengenali indikasi jatuh tanpa sensor tubuh",
+              ],
+              [
+                "Bukti & notifikasi",
+                "Snapshot, lokasi ruangan, alarm suara, dan klip singkat tersimpan rapi",
+              ],
+            ].map(([title, desc]) => (
+              <div
+                key={title}
+                className="rounded-2xl border border-[#d8e9e4] bg-white/85 px-5 py-4 text-left"
+              >
+                <p className="font-display text-sm font-bold text-[#0d7166] sm:text-base">
+                  {title}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[#335952] sm:text-sm">{desc}</p>
+              </div>
+            ))}
           </div>
         </section>
 

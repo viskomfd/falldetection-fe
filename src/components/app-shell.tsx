@@ -157,7 +157,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     void navigate({ to: "/login" });
   }
 
-  const avatarInitials = currentUser?.avatar_initials || "AP";
   const displayName = currentUser?.name || "Pak Andi";
 
   if (!authChecked || !isAuthenticated) return null;
@@ -185,10 +184,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.to}
                 to={item.to}
                 onClick={item.to === "/riwayat" ? markIncidentsRead : undefined}
-                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${isActive
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
+                  isActive
                     ? "bg-primary text-primary-foreground card-shadow"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                }`}
               >
                 <item.icon className="size-5" strokeWidth={2} />
                 <span className="flex flex-1 items-center justify-between gap-2">
@@ -207,12 +207,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="mb-2 flex items-center gap-2 rounded-2xl bg-muted px-3.5 py-2 text-xs font-semibold text-muted-foreground">
           <span
-            className={`size-2 shrink-0 rounded-full ${apiOnline === true
+            className={`size-2 shrink-0 rounded-full ${
+              apiOnline === true
                 ? "bg-success"
                 : apiOnline === false
                   ? "bg-destructive"
                   : "bg-muted-foreground/40"
-              }`}
+            }`}
           />
           <span>
             {apiOnline === true
@@ -262,9 +263,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               Memantau {elderlyName || "lansia"} secara real-time
             </p>
           </div>
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-card bg-primary text-xs font-bold text-primary-foreground sm:size-11">
-            {avatarInitials}
-          </span>
         </header>
 
         <div className="flex-1">{children}</div>
@@ -282,10 +280,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               to={item.to}
               onClick={item.to === "/riwayat" ? markIncidentsRead : undefined}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:flex-row sm:justify-center sm:gap-2 sm:text-xs ${isActive
+              className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:flex-row sm:justify-center sm:gap-2 sm:text-xs ${
+                isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                }`}
+              }`}
             >
               <item.icon className="size-5 shrink-0" strokeWidth={2} />
               <span className="truncate">{item.label}</span>
