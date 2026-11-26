@@ -5,6 +5,7 @@ import {
   Camera,
   Check,
   ChevronRight,
+  Download,
   Expand,
   Eye,
   History,
@@ -12,8 +13,10 @@ import {
   Pause,
   Play,
   Radio,
+  Share,
   ShieldCheck,
   Siren,
+  Smartphone,
   Video,
 } from "lucide-react";
 
@@ -34,6 +37,15 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { usePwaInstall } from "@/lib/pwa-install";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -89,6 +101,21 @@ function Landing() {
   const simVideoRef = useRef<HTMLVideoElement | null>(null);
   const [activeTab, setActiveTab] = useState<FeatureTab>("pantau");
   const [videoPlaying, setVideoPlaying] = useState(true);
+  const { isInstalled, triggerInstall } = usePwaInstall();
+  const [iosGuideOpen, setIosGuideOpen] = useState(false);
+  const [installHint, setInstallHint] = useState("");
+
+  async function handleInstallPwa() {
+    setInstallHint("");
+    const outcome = await triggerInstall();
+    if (outcome === "ios-guide") {
+      setIosGuideOpen(true);
+    } else if (outcome === "manual-hint") {
+      setInstallHint(
+        "Buka menu browser Anda lalu pilih 'Install App' / 'Tambah ke Layar Utama' untuk memasang aplikasi Rumi.",
+      );
+    }
+  }
 
   useEffect(() => {
     const root = rootRef.current;
@@ -226,7 +253,26 @@ function Landing() {
                 >
                   <Link to="/login">Coba Rumi</Link>
                 </Button>
+                {!isInstalled && (
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="outline"
+                    onClick={() => void handleInstallPwa()}
+                    className="rounded-full border-[#0d7166]/35 bg-[#e8f7f2] px-6 font-bold text-[#0d7166] hover:bg-[#d5efe6]"
+                  >
+                    <Download className="size-4" /> Install Aplikasi
+                  </Button>
+                )}
               </div>
+              {installHint && (
+                <p
+                  role="status"
+                  className="mx-auto mt-3 max-w-lg text-xs font-medium text-[#335952] lg:mx-0"
+                >
+                  {installHint}
+                </p>
+              )}
             </div>
 
             <div>
@@ -704,6 +750,50 @@ function Landing() {
           <p className="text-xs text-[#41635c] sm:justify-self-end">© 2026 Rumi</p>
         </div>
       </footer>
+
+      <Dialog open={iosGuideOpen} onOpenChange={setIosGuideOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Smartphone className="size-5 text-primary" />
+              Install Rumi di iPhone / iPad
+            </DialogTitle>
+            <DialogDescription>
+              Pasang Rumi di Layar Utama agar bisa login langsung dari aplikasi dan menerima
+              notifikasi darurat 24/7 meski browser ditutup.
+            </DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-3 text-sm text-foreground">
+            <li className="flex items-start gap-3 rounded-2xl bg-muted p-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                1
+              </span>
+              <span>
+                Ketuk ikon <Share className="mx-0.5 inline size-4 align-text-bottom text-primary" />{" "}
+                <strong>Share</strong> di bilah bawah Safari.
+              </span>
+            </li>
+            <li className="flex items-start gap-3 rounded-2xl bg-muted p-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                2
+              </span>
+              <span>
+                Pilih <strong>Add to Home Screen</strong> (<em>Tambah ke Layar Utama</em>), lalu
+                buka ikon <strong>Rumi</strong> dan login untuk mengaktifkan notifikasi 24/7.
+              </span>
+            </li>
+          </ol>
+          <DialogFooter>
+            <Button
+              type="button"
+              className="rounded-full"
+              onClick={() => setIosGuideOpen(false)}
+            >
+              Mengerti
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
+  BellRing,
   Cctv,
   History,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Settings,
   Siren,
@@ -31,8 +33,15 @@ import {
   markIncidentUnread,
   useUnreadIncidents,
 } from "@/lib/incident-unread";
-import { getNotificationPreferences } from "@/lib/notification-preferences";
-import { subscribeToWebPush, unsubscribeFromWebPush } from "@/lib/push-notifications";
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+} from "@/lib/notification-preferences";
+import {
+  isStandalonePwa,
+  subscribeToWebPush,
+  unsubscribeFromWebPush,
+} from "@/lib/push-notifications";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -51,6 +60,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
   const [floatingAlert, setFloatingAlert] = useState<Incident | null>(null);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [showPushOnboarding, setShowPushOnboarding] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
+  const [pushOnboardingError, setPushOnboardingError] = useState("");
 
   useEffect(() => {
     const authenticated = Boolean(getToken());
@@ -67,12 +79,24 @@ export function AppShell({ children }: { children: ReactNode }) {
       .then(() => setApiOnline(true))
       .catch(() => setApiOnline(false));
     // Sync Web Push subscription silently if desktop push is enabled and permitted
+    const prefs = getNotificationPreferences();
     if (
-      getNotificationPreferences().desktop &&
+      prefs.desktop &&
       typeof Notification !== "undefined" &&
       Notification.permission === "granted"
     ) {
+      setShowPushOnboarding(false);
       void subscribeToWebPush().catch(() => undefined);
+    } else if (
+      isStandalonePwa() &&
+      typeof window !== "undefined" &&
+      window.isSecureContext &&
+      "PushManager" in window &&
+      typeof Notification !== "undefined" &&
+      Notification.permission !== "denied" &&
+      sessionStorage.getItem("rumi_push_banner_dismissed") !== "1"
+    ) {
+      setShowPushOnboarding(true);
     }
     // Sync current user profile from backend
     authApi
@@ -133,6 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               showDesktopNotification(
                 "🚨 PERINGATAN: Deteksi Jatuh!",
                 `Kejadian jatuh terdeteksi pada ${elderlyName || incident.person_name || "orang"} di ${incident.location || "kamera"}!`,
+                `rumi-fall-${incident.id || "alert"}`,
               );
             }
             window.dispatchEvent(new CustomEvent("rumi:fall-alert", { detail: incident }));
@@ -150,6 +175,30 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (ws) ws.close();
     };
   }, [elderlyName, isAuthenticated]);
+
+  async function handleEnablePushFromBanner() {
+    setPushOnboardingError("");
+    setEnablingPush(true);
+    try {
+      await subscribeToWebPush();
+      const next = { ...getNotificationPreferences(), desktop: true };
+      saveNotificationPreferences(next);
+      setShowPushOnboarding(false);
+    } catch (error) {
+      setPushOnboardingError(
+        error instanceof Error ? error.message : "Gagal mengaktifkan notifikasi push.",
+      );
+    } finally {
+      setEnablingPush(false);
+    }
+  }
+
+  function handleDismissPushBanner() {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("rumi_push_banner_dismissed", "1");
+    }
+    setShowPushOnboarding(false);
+  }
 
   async function handleLogout() {
     await unsubscribeFromWebPush().catch(() => undefined);
@@ -264,6 +313,53 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
         </header>
+
+        {showPushOnboarding && (
+          <section
+            aria-label="Aktivasi notifikasi push 24/7"
+            className="card-shadow mb-4 flex flex-col gap-3 rounded-3xl border border-primary/25 bg-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                <BellRing className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">
+                  Aktifkan Notifikasi Darurat 24/7
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Aplikasi Rumi sudah terpasang. Aktifkan izin push agar alert jatuh tetap masuk
+                  meski aplikasi ditutup (tanpa menyalakan kamera di background).
+                </p>
+                {pushOnboardingError && (
+                  <p role="alert" className="mt-1 text-xs font-semibold text-destructive">
+                    {pushOnboardingError}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-full"
+                disabled={enablingPush}
+                onClick={() => void handleEnablePushFromBanner()}
+              >
+                {enablingPush && <Loader2 className="size-3.5 animate-spin" />}
+                {enablingPush ? "Mengaktifkan..." : "Aktifkan Sekarang"}
+              </Button>
+              <button
+                type="button"
+                onClick={handleDismissPushBanner}
+                className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                aria-label="Tutup banner aktivasi notifikasi"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </section>
+        )}
 
         <div className="flex-1">{children}</div>
       </main>

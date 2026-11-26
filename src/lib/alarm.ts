@@ -31,18 +31,24 @@ export function playFallAlarm(): void {
   }
 }
 
-export function showDesktopNotification(title: string, body: string): void {
+export function showDesktopNotification(title: string, body: string, tag?: string): void {
   if (typeof window === "undefined" || !("Notification" in window)) return;
+
+  const options: NotificationOptions = {
+    body,
+    icon: "/icon.png",
+    ...(tag ? { tag } : {}),
+  };
 
   if (Notification.permission === "granted") {
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker
         .register("/notification-sw.js")
-        .then((registration) => registration.showNotification(title, { body, icon: "/icon.png" }))
+        .then((registration) => registration.showNotification(title, options))
         .catch(() => undefined);
     } else {
       try {
-        new Notification(title, { body, icon: "/icon.png" });
+        new Notification(title, options);
       } catch {
         // Browser does not support direct notifications.
       }
@@ -50,7 +56,7 @@ export function showDesktopNotification(title: string, body: string): void {
   } else if (Notification.permission === "default") {
     void Notification.requestPermission().then((perm) => {
       if (perm === "granted") {
-        showDesktopNotification(title, body);
+        showDesktopNotification(title, body, tag);
       }
     });
   }

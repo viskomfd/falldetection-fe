@@ -49,8 +49,8 @@ import {
   isStandalonePwa,
   subscribeToWebPush,
   unsubscribeFromWebPush,
-  type BeforeInstallPromptEvent,
 } from "@/lib/push-notifications";
+import { usePwaInstall } from "@/lib/pwa-install";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
@@ -118,9 +118,7 @@ function PengaturanPage() {
   const [updatingPush, setUpdatingPush] = useState(false);
   const [testingNotification, setTestingNotification] = useState(false);
   const [notificationTestStatus, setNotificationTestStatus] = useState("");
-  const [deferredInstallPrompt, setDeferredInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [isPwaInstalled, setIsPwaInstalled] = useState(false);
+  const { isInstalled: isPwaInstalled, triggerInstall } = usePwaInstall();
   const [iosGuideOpen, setIosGuideOpen] = useState(false);
   const [pwaInstallHint, setPwaInstallHint] = useState("");
   const [resettingTrackers, setResettingTrackers] = useState(false);
@@ -150,27 +148,6 @@ function PengaturanPage() {
       .status()
       .then((status) => setModelStatus(status))
       .catch(() => setModelStatus(null));
-  }, []);
-
-  useEffect(() => {
-    setIsPwaInstalled(isStandalonePwa());
-
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-    const handleAppInstalled = () => {
-      setIsPwaInstalled(true);
-      setDeferredInstallPrompt(null);
-      setPwaInstallHint("");
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
   }, []);
 
   async function handleLogoutAll() {
@@ -233,28 +210,14 @@ function PengaturanPage() {
 
   async function handleInstallPwa() {
     setPwaInstallHint("");
-    if (deferredInstallPrompt) {
-      try {
-        await deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        setDeferredInstallPrompt(null);
-        if (choice.outcome === "accepted") {
-          setIsPwaInstalled(true);
-        }
-      } catch {
-        setPwaInstallHint("Gagal membuka dialog instalasi. Coba pasang melalui menu browser.");
-      }
-      return;
-    }
-
-    if (isIosDevice()) {
+    const outcome = await triggerInstall();
+    if (outcome === "ios-guide") {
       setIosGuideOpen(true);
-      return;
+    } else if (outcome === "manual-hint") {
+      setPwaInstallHint(
+        "Buka menu browser Anda lalu pilih 'Install App' / 'Tambah ke Layar Utama' / 'Add to Dock' untuk memasang PWA Rumi.",
+      );
     }
-
-    setPwaInstallHint(
-      "Buka menu browser Anda lalu pilih 'Install App' / 'Tambah ke Layar Utama' / 'Add to Dock' untuk memasang PWA Rumi.",
-    );
   }
 
   async function handleNotificationChange(id: keyof NotificationPreferences, checked: boolean) {
