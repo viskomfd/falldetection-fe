@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
+import { saveElderlyName } from "@/lib/elderly-profile";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/register")({
 function RegisterPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [elderlyName, setElderlyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,11 +44,23 @@ function RegisterPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
+
+    const trimmedElderlyName = elderlyName.trim();
+    if (!trimmedElderlyName) {
+      setErrorMessage("Nama lansia harus diisi.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { user } = await authApi.register({ name, email, password });
-      void navigate({ to: user.elderly_name ? "/dashboard" : "/setup-lansia" });
+      await authApi.register({ name, email, password });
+      try {
+        await saveElderlyName(trimmedElderlyName);
+        void navigate({ to: "/dashboard" });
+      } catch {
+        void navigate({ to: "/setup-lansia" });
+      }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Pendaftaran gagal. Silakan coba lagi.");
     } finally {
@@ -117,6 +131,19 @@ function RegisterPage() {
                   placeholder="Nama Anda"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className="rounded-2xl bg-background px-4 py-6"
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="elderly-name">Nama Lansia</Label>
+                <Input
+                  id="elderly-name"
+                  type="text"
+                  required
+                  placeholder="Contoh: Ibu Siti"
+                  value={elderlyName}
+                  onChange={(e) => setElderlyName(e.target.value)}
                   className="rounded-2xl bg-background px-4 py-6"
                   disabled={loading}
                 />
