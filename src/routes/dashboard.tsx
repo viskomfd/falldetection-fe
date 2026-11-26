@@ -1,15 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Camera,
-  Cctv,
-  CircleAlert,
-  Gauge,
-  RadioTower,
-  Siren,
-  X,
-} from "lucide-react";
+import { Camera, Cctv, Siren, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import fallSnapshot from "@/assets/fall-snapshot.jpg";
@@ -21,11 +11,9 @@ import { Button } from "@/components/ui/button";
 import {
   dashboardApi,
   incidentApi,
-  modelApi,
   resolveMediaUrl,
   type DashboardStats,
   type Incident,
-  type ModelStatus,
 } from "@/lib/api";
 import { fetchCameras, updateCameraStatus, useSavedCameras } from "@/lib/cameras";
 import { useElderlyName } from "@/lib/elderly-profile";
@@ -79,7 +67,6 @@ function Dashboard() {
   const savedCameras = useSavedCameras();
   const elderlyName = useElderlyName();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [activeAlert, setActiveAlert] = useState<Incident | null>(null);
   const notificationPreferences = getNotificationPreferences();
 
@@ -97,11 +84,6 @@ function Dashboard() {
     };
 
     refreshDashboard();
-
-    modelApi
-      .status()
-      .then((status) => setModelStatus(status))
-      .catch((err) => console.warn("Could not fetch model status:", err));
 
     const pollTimer = window.setInterval(refreshDashboard, 12_000);
 
@@ -157,8 +139,6 @@ function Dashboard() {
       ? stats.active_cameras + localOnlyActiveCount
       : savedCameras.filter((c) => c.status !== "offline").length;
   const unavailableCameraCount = Math.max(0, totalCameras - activeCamerasCount);
-  const uptime = stats?.uptime_percentage ?? 99.6;
-  const latency = stats?.latency_seconds ?? 2.4;
   const weeklyActivity = stats?.weekly_activity?.length
     ? stats.weekly_activity
     : DEFAULT_WEEK_ACTIVITY;
@@ -173,8 +153,46 @@ function Dashboard() {
   const alertPerson = elderlyName || activeAlert?.person_name || "Lansia";
   const alertResponseTime = activeAlert?.response_time_seconds || 2.1;
 
+  const activeCameraBadge = (
+    <Link
+      to="/kamera"
+      title={
+        unavailableCameraCount > 0
+          ? `${unavailableCameraCount} kamera offline / perlu diperiksa`
+          : "Semua kamera terhubung dengan baik"
+      }
+      className="card-shadow flex items-center gap-2 rounded-2xl bg-card px-2.5 py-2 transition-colors hover:bg-accent/60 sm:gap-3 sm:px-3.5 sm:py-2"
+    >
+      <span
+        className={`flex size-8 shrink-0 items-center justify-center rounded-full sm:size-9 ${
+          unavailableCameraCount > 0
+            ? "bg-destructive/10 text-destructive"
+            : "bg-secondary text-primary"
+        }`}
+      >
+        <Camera className="size-4" />
+      </span>
+      <div className="leading-tight">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-muted-foreground sm:text-xs">
+            Kamera Aktif
+          </span>
+          <span
+            className={`size-1.5 shrink-0 rounded-full ${
+              unavailableCameraCount > 0 ? "bg-destructive" : "bg-success"
+            }`}
+          />
+        </div>
+        <p className="font-display text-sm font-bold text-foreground sm:text-base">
+          {activeCamerasCount}
+          <span className="text-xs font-semibold text-muted-foreground">/{totalCameras}</span>
+        </p>
+      </div>
+    </Link>
+  );
+
   return (
-    <AppShell>
+    <AppShell headerAction={activeCameraBadge}>
       <div className="flex flex-col gap-5">
         {/* Fall alert banner - hanya muncul jika ada active alert */}
         {notificationPreferences.popup && activeAlert && (
@@ -284,100 +302,14 @@ function Dashboard() {
           </section>
         </div>
 
-        {/* Stat cards */}
-        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:gap-5">
-          <div className="card-shadow rounded-3xl bg-card p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-bold text-foreground">Kamera Aktif</p>
-                <p className="mt-2 font-display text-3xl font-bold text-foreground">
-                  {activeCamerasCount}
-                  <span className="text-lg text-muted-foreground">/{totalCameras}</span>
-                </p>
-              </div>
-              <span className="flex size-11 items-center justify-center rounded-full bg-secondary text-primary">
-                <Camera className="size-5" />
-              </span>
-            </div>
-            {unavailableCameraCount > 0 ? (
-              <p className="mt-3 text-xs font-semibold text-destructive">
-                <ArrowDownRight className="mr-1 inline size-4" />
-                {unavailableCameraCount} kamera offline / perlu diperiksa
-              </p>
-            ) : (
-              <p className="mt-3 text-xs font-semibold text-success">
-                <ArrowUpRight className="mr-1 inline size-4" />
-                Semua kamera terhubung dengan baik
-              </p>
-            )}
-          </div>
-
-          <div className="card-shadow rounded-3xl bg-card p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-bold text-foreground">Uptime Sistem</p>
-                <p className="mt-2 font-display text-3xl font-bold text-foreground">
-                  {uptime}
-                  <span className="text-lg text-muted-foreground">%</span>
-                </p>
-              </div>
-              <span className="flex size-11 items-center justify-center rounded-full bg-secondary text-primary">
-                <RadioTower className="size-5" />
-              </span>
-            </div>
-            <p className="mt-3 text-xs font-semibold text-success">
-              <ArrowUpRight className="mr-1 inline size-4" />
-              Di atas target 99,5%
-            </p>
-          </div>
-
-          <div className="card-shadow rounded-3xl bg-card p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-bold text-foreground">Latensi Alert</p>
-                <p className="mt-2 font-display text-3xl font-bold text-foreground">
-                  {latency}
-                  <span className="text-lg text-muted-foreground"> dtk</span>
-                </p>
-              </div>
-              <span className="flex size-11 items-center justify-center rounded-full bg-secondary text-primary">
-                <Gauge className="size-5" />
-              </span>
-            </div>
-            <p className="mt-3 text-xs font-semibold text-success">
-              <CircleAlert className="mr-1 inline size-4 text-success" />
-              Real-time, konsisten &lt; 3 detik
-            </p>
-          </div>
-        </section>
-
         {/* Weekly activity */}
         <section className="card-shadow rounded-3xl bg-card p-4 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Insiden 7 Hari Terakhir</h2>
-              <p className="text-sm text-muted-foreground">
-                Total {weeklyActivity.reduce((acc, curr) => acc + curr.value, 0)} kejadian
-                terdeteksi minggu ini
-              </p>
-            </div>
-            <Badge
-              variant="secondary"
-              title={modelStatus?.message || modelStatus?.model_file}
-              className={`rounded-full ${
-                modelStatus
-                  ? modelStatus.is_model_loaded
-                    ? "bg-success/15 text-success"
-                    : "bg-destructive/15 text-destructive"
-                  : ""
-              }`}
-            >
-              {modelStatus
-                ? modelStatus.is_model_loaded
-                  ? `Model AI Aktif${modelStatus.mode ? ` · ${modelStatus.mode}` : ""}`
-                  : "Model AI Tidak Aktif"
-                : "Mode CCTV aktif"}
-            </Badge>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Insiden 7 Hari Terakhir</h2>
+            <p className="text-sm text-muted-foreground">
+              Total {weeklyActivity.reduce((acc, curr) => acc + curr.value, 0)} kejadian terdeteksi
+              minggu ini
+            </p>
           </div>
           <div className="mt-6 flex h-36 items-end gap-1 sm:gap-3">
             {weeklyActivity.map((item) => {

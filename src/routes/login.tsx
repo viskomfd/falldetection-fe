@@ -56,18 +56,36 @@ function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Brand panel */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground lg:flex">
+    <div className="flex min-h-dvh w-full flex-col lg:h-dvh lg:flex-row lg:overflow-hidden">
+      {/* Mobile brand header */}
+      <header className="flex items-center justify-between bg-primary px-5 py-4 text-primary-foreground lg:hidden">
         <Link to="/" className="flex items-center gap-2">
+          <BrandLogo
+            src="/icon-white.png"
+            imageClassName="size-9"
+            textClassName="text-xl text-primary-foreground"
+          />
+        </Link>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-white/20"
+        >
+          <ArrowLeft className="size-3.5" />
+          Beranda
+        </Link>
+      </header>
+
+      {/* Brand panel */}
+      <aside className="relative hidden shrink-0 flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:h-full lg:w-1/2 xl:p-14">
+        <Link to="/" className="flex w-fit items-center gap-2">
           <BrandLogo
             src="/icon-white.png"
             imageClassName="size-12"
             textClassName="text-2xl text-primary-foreground"
           />
         </Link>
-        <div>
-          <h2 className="max-w-md text-4xl leading-tight font-bold">
+        <div className="w-full max-w-md">
+          <h2 className="text-3xl leading-tight font-bold xl:text-4xl">
             Selamat datang kembali. Orang tersayang Anda tetap dalam pantauan.
           </h2>
           <ul className="mt-8 space-y-4 text-sm text-primary-foreground/85">
@@ -87,17 +105,21 @@ function LoginPage() {
       </aside>
 
       {/* Form */}
-      <main className="flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
-          <Button asChild variant="ghost" className="-ml-2 mb-6 rounded-full text-muted-foreground">
+      <main className="flex flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6 sm:py-10 lg:h-full lg:w-1/2 lg:px-10">
+        <div className="m-auto w-full max-w-md">
+          <Button
+            asChild
+            variant="ghost"
+            className="-ml-2 mb-5 hidden rounded-full text-muted-foreground lg:inline-flex"
+          >
             <Link to="/">
               <ArrowLeft className="size-4" />
               Kembali ke beranda
             </Link>
           </Button>
 
-          <div className="card-shadow rounded-4xl bg-card p-8">
-            <h1 className="text-3xl font-bold text-foreground">Masuk</h1>
+          <div className="card-shadow rounded-3xl bg-card p-6 sm:rounded-4xl sm:p-8">
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Masuk</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Masuk untuk melihat dashboard pemantauan Anda.
             </p>
@@ -108,7 +130,7 @@ function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5 sm:mt-8">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -118,7 +140,7 @@ function LoginPage() {
                   placeholder="nama@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-2xl bg-background px-4 py-6"
+                  className="rounded-2xl bg-background px-4 py-5 sm:py-6"
                   disabled={loading}
                 />
               </div>
@@ -137,7 +159,7 @@ function LoginPage() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="rounded-2xl bg-background px-4 py-6 pr-12"
+                    className="rounded-2xl bg-background px-4 py-5 pr-12 sm:py-6"
                     disabled={loading}
                   />
                   <button

@@ -69,18 +69,36 @@ function RegisterPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Brand panel */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground lg:flex">
+    <div className="flex min-h-dvh w-full flex-col lg:h-dvh lg:flex-row lg:overflow-hidden">
+      {/* Mobile brand header */}
+      <header className="flex items-center justify-between bg-primary px-5 py-4 text-primary-foreground lg:hidden">
         <Link to="/" className="flex items-center gap-2">
+          <BrandLogo
+            src="/icon-white.png"
+            imageClassName="size-9"
+            textClassName="text-xl text-primary-foreground"
+          />
+        </Link>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-white/20"
+        >
+          <ArrowLeft className="size-3.5" />
+          Beranda
+        </Link>
+      </header>
+
+      {/* Brand panel */}
+      <aside className="relative hidden shrink-0 flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:h-full lg:w-1/2 xl:p-14">
+        <Link to="/" className="flex w-fit items-center gap-2">
           <BrandLogo
             src="/icon-white.png"
             imageClassName="size-12"
             textClassName="text-2xl text-primary-foreground"
           />
         </Link>
-        <div>
-          <h2 className="max-w-md text-4xl leading-tight font-bold">
+        <div className="w-full max-w-md">
+          <h2 className="text-3xl leading-tight font-bold xl:text-4xl">
             Buat akun dan mulai pantau dalam beberapa menit.
           </h2>
           <ul className="mt-8 space-y-4 text-sm text-primary-foreground/85">
@@ -100,17 +118,21 @@ function RegisterPage() {
       </aside>
 
       {/* Form */}
-      <main className="flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
-          <Button asChild variant="ghost" className="-ml-2 mb-6 rounded-full text-muted-foreground">
+      <main className="flex flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6 sm:py-10 lg:h-full lg:w-1/2 lg:px-10">
+        <div className="m-auto w-full max-w-md">
+          <Button
+            asChild
+            variant="ghost"
+            className="-ml-2 mb-5 hidden rounded-full text-muted-foreground lg:inline-flex"
+          >
             <Link to="/">
               <ArrowLeft className="size-4" />
               Kembali ke beranda
             </Link>
           </Button>
 
-          <div className="card-shadow rounded-4xl bg-card p-8">
-            <h1 className="text-3xl font-bold text-foreground">Daftar</h1>
+          <div className="card-shadow rounded-3xl bg-card p-6 sm:rounded-4xl sm:p-8">
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Daftar</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Buat akun Rumi untuk Anda dan orang tersayang.
             </p>
@@ -121,7 +143,7 @@ function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="name">Nama Lengkap</Label>
                 <Input
@@ -131,7 +153,7 @@ function RegisterPage() {
                   placeholder="Nama Anda"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="rounded-2xl bg-background px-4 py-6"
+                  className="rounded-2xl bg-background px-4 py-5"
                   disabled={loading}
                 />
               </div>
@@ -144,7 +166,7 @@ function RegisterPage() {
                   placeholder="Contoh: Ibu Siti"
                   value={elderlyName}
                   onChange={(e) => setElderlyName(e.target.value)}
-                  className="rounded-2xl bg-background px-4 py-6"
+                  className="rounded-2xl bg-background px-4 py-5"
                   disabled={loading}
                 />
               </div>
@@ -157,7 +179,7 @@ function RegisterPage() {
                   placeholder="nama@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-2xl bg-background px-4 py-6"
+                  className="rounded-2xl bg-background px-4 py-5"
                   disabled={loading}
                 />
               </div>
@@ -172,7 +194,7 @@ function RegisterPage() {
                     placeholder="Minimal 8 karakter"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="rounded-2xl bg-background px-4 py-6 pr-12"
+                    className="rounded-2xl bg-background px-4 py-5 pr-12"
                     disabled={loading}
                   />
                   <button
@@ -188,7 +210,7 @@ function RegisterPage() {
               <Button
                 type="submit"
                 size="lg"
-                className="rounded-full font-semibold"
+                className="mt-1 rounded-full font-semibold"
                 disabled={loading}
               >
                 {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
@@ -199,7 +221,7 @@ function RegisterPage() {
               </p>
             </form>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
+            <p className="mt-5 text-center text-sm text-muted-foreground">
               Sudah punya akun?{" "}
               <Link to="/login" className="font-semibold text-primary hover:underline">
                 Masuk di sini

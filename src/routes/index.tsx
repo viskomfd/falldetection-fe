@@ -725,29 +725,93 @@ function Landing() {
         </section>
       </main>
 
-      <footer className="border-t border-[#dcebe7] bg-white px-4 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-center sm:grid sm:grid-cols-[1fr_auto_1fr] sm:text-left">
-          <div className="flex items-center gap-3 sm:justify-self-start">
-            <BrandLogo imageClassName="size-8" textClassName="text-[#0d7166]" />
-            <span className="hidden text-xs text-[#41635c] lg:inline">
-              Monitoring CCTV dan notifikasi indikasi jatuh
-            </span>
+      <footer className="border-t border-[#0f4d46] bg-[#0a3934] text-[#e6f4f0]">
+        <div className="mx-auto max-w-6xl px-5 pt-10 pb-7 sm:px-6 sm:pt-12 sm:pb-8">
+          <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
+            <div className="lg:col-span-6">
+              <a
+                href="#beranda"
+                aria-label="Rumi, kembali ke beranda"
+                className="inline-flex items-center gap-2"
+              >
+                <BrandLogo
+                  src="/icon-white.png"
+                  imageClassName="size-8 sm:size-9"
+                  textClassName="text-lg text-white sm:text-xl"
+                />
+              </a>
+              <p className="mt-3 max-w-md text-sm leading-6 text-[#b9dad2]">
+                Platform pemantauan CCTV rumah dan deteksi indikasi jatuh secara real-time untuk
+                membantu keluarga menjaga orang tersayang dengan lebih tenang.
+              </p>
+              <p className="mt-3 max-w-md rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs leading-5 text-[#9ac2b9]">
+                Alat bantu pemantauan rumah tangga, bukan perangkat medis atau layanan darurat.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 lg:col-span-6 lg:gap-8">
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-white/60 uppercase">
+                  Navigasi
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm font-medium text-[#d2ebe5]">
+                  <li>
+                    <a href="#beranda" className="transition-colors hover:text-white">
+                      Beranda
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#simulasi" className="transition-colors hover:text-white">
+                      Simulasi
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#fitur" className="transition-colors hover:text-white">
+                      Fitur
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#faq" className="transition-colors hover:text-white">
+                      FAQ
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-white/60 uppercase">
+                  Aplikasi
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm font-medium text-[#d2ebe5]">
+                  <li>
+                    <Link to="/login" className="transition-colors hover:text-white">
+                      Masuk
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/register" className="transition-colors hover:text-white">
+                      Buat Akun
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/dashboard" className="transition-colors hover:text-white">
+                      Dashboard
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/riwayat" className="transition-colors hover:text-white">
+                      Riwayat Insiden
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap justify-center gap-6 text-xs font-semibold text-[#335952] sm:justify-self-center">
-            <a href="#simulasi" className="hover:text-[#0d7166]">
-              Simulasi
-            </a>
-            <a href="#fitur" className="hover:text-[#0d7166]">
-              Fitur
-            </a>
-            <a href="#faq" className="hover:text-[#0d7166]">
-              FAQ
-            </a>
-            <Link to="/login" className="hover:text-[#0d7166]">
-              Login
-            </Link>
+
+          <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-5 text-center text-xs text-[#9ac2b9] sm:flex-row sm:text-left">
+            <p>© 2026 Rumi. Hak cipta dilindungi.</p>
+            <p>Sistem Deteksi Jatuh &amp; Monitoring CCTV Rumah</p>
           </div>
-          <p className="text-xs text-[#41635c] sm:justify-self-end">© 2026 Rumi</p>
         </div>
       </footer>
 

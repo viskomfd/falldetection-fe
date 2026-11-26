@@ -50,7 +50,13 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/pengaturan", label: "Pengaturan", icon: Settings },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  headerAction,
+}: {
+  children: ReactNode;
+  headerAction?: ReactNode;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const elderlyName = useElderlyName();
@@ -308,10 +314,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <h1 className="truncate text-xl font-extrabold text-foreground sm:text-2xl">
               Selamat Siang, {displayName}!
             </h1>
-            <p className="text-xs text-muted-foreground sm:text-sm">
+            <p className="truncate text-xs text-muted-foreground sm:text-sm">
               Memantau {elderlyName || "lansia"} secara real-time
             </p>
           </div>
+          {headerAction && <div className="shrink-0">{headerAction}</div>}
         </header>
 
         {showPushOnboarding && (
