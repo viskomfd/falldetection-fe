@@ -16,6 +16,7 @@ type CameraStreamProps = {
   url: string;
   protocol: CameraProtocol;
   status?: "online" | "offline" | undefined;
+  onStatusChange?: ((status: "online" | "offline") => void) | undefined;
   className?: string;
 };
 
@@ -26,6 +27,7 @@ export function CameraStream({
   url,
   protocol,
   status = "online",
+  onStatusChange,
   className,
 }: CameraStreamProps) {
   const [failed, setFailed] = useState(false);
@@ -73,9 +75,13 @@ export function CameraStream({
         className={`camera-stream-offline flex aspect-video w-full flex-col items-center justify-center gap-2 bg-muted p-6 text-center ${className ?? ""}`}
       >
         <CameraOff className="size-8 text-muted-foreground/60" />
-        <p className="text-sm font-bold text-muted-foreground">Kamera Dinonaktifkan</p>
+        <p className="text-sm font-bold text-muted-foreground">
+          {isDeviceCamera ? "Kamera Dinonaktifkan" : "Kamera Offline"}
+        </p>
         <p className="text-xs text-muted-foreground/70">
-          {name} · aktifkan kembali untuk melanjutkan deteksi
+          {isDeviceCamera
+            ? `${name} · aktifkan kembali untuk melanjutkan deteksi`
+            : `${name} · stream terputus atau dinonaktifkan`}
         </p>
       </div>
     );
@@ -114,7 +120,14 @@ export function CameraStream({
       src={playbackUrl}
       alt={`Live feed kamera ${name}`}
       className={`camera-media aspect-video w-full object-cover ${className ?? ""}`}
-      onError={() => setFailed(true)}
+      onLoad={() => {
+        setFailed(false);
+        onStatusChange?.("online");
+      }}
+      onError={() => {
+        setFailed(true);
+        onStatusChange?.("offline");
+      }}
     />
   );
 }

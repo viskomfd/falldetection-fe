@@ -21,6 +21,92 @@ import {
 
 type SourceMode = "idle" | "webcam" | "video";
 
+type ClipResult = {
+  blob: Blob;
+  durationSeconds: number;
+  mimeType: string;
+};
+
+type ActiveClipRecording = {
+  recorder: MediaRecorder;
+  stream: MediaStream;
+  timerId: number;
+  maxCapTimerId: number;
+  postFallTimerId: number | null;
+  chunks: Blob[];
+  startedAt: number;
+  mimeType: string;
+  isFinishing: boolean;
+  cancelled: boolean;
+  resolveFinish: ((result: ClipResult | null) => void) | null;
+};
+
+const CLIP_FRAME_INTERVAL_MS = 66;
+const SUSPECTED_CLIP_MAX_DURATION_MS = 15_000;
+const POST_FALL_RECORD_MS = 3500;
+const FALLBACK_CLIP_DURATION_MS = 4500;
+
+function pickSupportedClipMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) return "video/webm;codecs=vp8";
+  if (MediaRecorder.isTypeSupported("video/webm")) return "video/webm";
+  if (MediaRecorder.isTypeSupported("video/mp4")) return "video/mp4";
+  return "";
+}
+
+function getClipFilename(mimeType: string): string {
+  return mimeType.includes("mp4") ? "fall-clip.mp4" : "fall-clip.webm";
+}
+
+function createCanvasClipRecorder(
+  video: HTMLVideoElement,
+  overlayCanvas: HTMLCanvasElement,
+): {
+  recorder: MediaRecorder;
+  stream: MediaStream;
+  timerId: number;
+  chunks: Blob[];
+  startedAt: number;
+  mimeType: string;
+} | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  const srcW = video.videoWidth || overlayCanvas.width;
+  const srcH = video.videoHeight || overlayCanvas.height;
+  if (!srcW || !srcH) return null;
+
+  const scale = Math.min(1, 640 / srcW);
+  const recCanvas = document.createElement("canvas");
+  recCanvas.width = Math.max(2, Math.round(srcW * scale));
+  recCanvas.height = Math.max(2, Math.round(srcH * scale));
+  const recCtx = recCanvas.getContext("2d");
+  if (!recCtx || typeof recCanvas.captureStream !== "function") return null;
+
+  const mimeType = pickSupportedClipMimeType();
+  const stream = recCanvas.captureStream(15);
+  const recorder = mimeType
+    ? new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 900_000 })
+    : new MediaRecorder(stream);
+
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (ev) => {
+    if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+  };
+
+  const drawFrame = () => {
+    if (video.readyState >= 2) {
+      recCtx.drawImage(video, 0, 0, recCanvas.width, recCanvas.height);
+      recCtx.drawImage(overlayCanvas, 0, 0, recCanvas.width, recCanvas.height);
+    }
+  };
+
+  drawFrame();
+  const timerId = window.setInterval(drawFrame, CLIP_FRAME_INTERVAL_MS);
+  const startedAt = Date.now();
+  recorder.start(250);
+
+  return { recorder, stream, timerId, chunks, startedAt, mimeType };
+}
+
 type OnDeviceCameraProps = {
   cameraId?: string | undefined;
   cameraName?: string | undefined;
@@ -47,6 +133,7 @@ export function OnDeviceCamera({
   const runIdRef = useRef(0);
   const videoUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const activeClipRef = useRef<ActiveClipRecording | null>(null);
 
   const [mode, setMode] = useState<SourceMode>("idle");
   const [facingMode, setFacingMode] = useState<DeviceFacingMode>(initialFacingMode);
@@ -57,10 +144,143 @@ export function OnDeviceCamera({
   const [fallCount, setFallCount] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  function cleanupClipTimersAndStream(active: ActiveClipRecording) {
+    window.clearInterval(active.timerId);
+    window.clearTimeout(active.maxCapTimerId);
+    if (active.postFallTimerId !== null) {
+      window.clearTimeout(active.postFallTimerId);
+      active.postFallTimerId = null;
+    }
+    active.stream.getTracks().forEach((t) => t.stop());
+  }
+
+  function cancelActiveClipRecording() {
+    const active = activeClipRef.current;
+    if (!active) return;
+    activeClipRef.current = null;
+    active.cancelled = true;
+    cleanupClipTimersAndStream(active);
+
+    if (active.recorder.state !== "inactive") {
+      try {
+        active.recorder.stop();
+      } catch {
+        // ignore stop errors on already-ended recorder
+      }
+    }
+    active.chunks.length = 0;
+    const resolveFinish = active.resolveFinish;
+    active.resolveFinish = null;
+    resolveFinish?.(null);
+  }
+
+  function startSuspectedClipRecording(
+    video: HTMLVideoElement,
+    overlayCanvas: HTMLCanvasElement,
+  ) {
+    if (activeClipRef.current !== null) return;
+    try {
+      const created = createCanvasClipRecorder(video, overlayCanvas);
+      if (!created) return;
+
+      const active: ActiveClipRecording = {
+        ...created,
+        maxCapTimerId: 0,
+        postFallTimerId: null,
+        isFinishing: false,
+        cancelled: false,
+        resolveFinish: null,
+      };
+
+      const finalizeRecording = (failed: boolean) => {
+        cleanupClipTimersAndStream(active);
+        if (activeClipRef.current === active) {
+          activeClipRef.current = null;
+        }
+        const resolveFinish = active.resolveFinish;
+        active.resolveFinish = null;
+
+        if (active.cancelled || failed || active.chunks.length === 0) {
+          active.chunks.length = 0;
+          resolveFinish?.(null);
+          return;
+        }
+
+        const effectiveType = active.mimeType || active.chunks[0]?.type || "video/webm";
+        const blob = new Blob(active.chunks, { type: effectiveType });
+        active.chunks.length = 0;
+        if (blob.size < 1024) {
+          resolveFinish?.(null);
+          return;
+        }
+
+        const durationSeconds = Math.max(1, Math.round((Date.now() - active.startedAt) / 1000));
+        resolveFinish?.({ blob, durationSeconds, mimeType: effectiveType });
+      };
+
+      active.recorder.onstop = () => finalizeRecording(false);
+      active.recorder.onerror = () => finalizeRecording(true);
+
+      // Safety cap agar recorder tidak berjalan tanpa batas jika status tertahan di SUSPECTED FALL
+      active.maxCapTimerId = window.setTimeout(() => {
+        if (activeClipRef.current === active && !active.isFinishing) {
+          cancelActiveClipRecording();
+        }
+      }, SUSPECTED_CLIP_MAX_DURATION_MS);
+
+      activeClipRef.current = active;
+    } catch (err) {
+      console.warn("Gagal memulai perekaman pre-fall kamera device:", err);
+    }
+  }
+
+  function finishActiveClipRecording(
+    active: ActiveClipRecording,
+    postFallMs = POST_FALL_RECORD_MS,
+  ): Promise<ClipResult | null> {
+    active.isFinishing = true;
+    window.clearTimeout(active.maxCapTimerId);
+
+    return new Promise<ClipResult | null>((resolve) => {
+      active.resolveFinish = resolve;
+
+      if (active.recorder.state === "inactive") {
+        cleanupClipTimersAndStream(active);
+        if (activeClipRef.current === active) {
+          activeClipRef.current = null;
+        }
+        active.resolveFinish = null;
+        if (active.cancelled || active.chunks.length === 0) {
+          active.chunks.length = 0;
+          resolve(null);
+          return;
+        }
+        const effectiveType = active.mimeType || active.chunks[0]?.type || "video/webm";
+        const blob = new Blob(active.chunks, { type: effectiveType });
+        active.chunks.length = 0;
+        if (blob.size < 1024) {
+          resolve(null);
+          return;
+        }
+        const durationSeconds = Math.max(1, Math.round((Date.now() - active.startedAt) / 1000));
+        resolve({ blob, durationSeconds, mimeType: effectiveType });
+        return;
+      }
+
+      active.postFallTimerId = window.setTimeout(() => {
+        active.postFallTimerId = null;
+        if (active.recorder.state !== "inactive") {
+          active.recorder.stop();
+        }
+      }, postFallMs);
+    });
+  }
+
   function stopLoopAndMedia(invalidateRun = true) {
     if (invalidateRun) {
       runIdRef.current += 1;
     }
+    cancelActiveClipRecording();
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -93,60 +313,26 @@ export function OnDeviceCamera({
   async function recordClipBlob(
     video: HTMLVideoElement,
     overlayCanvas: HTMLCanvasElement,
-    durationMs = 5000,
-  ): Promise<{ blob: Blob; durationSeconds: number } | null> {
+    durationMs = FALLBACK_CLIP_DURATION_MS,
+  ): Promise<ClipResult | null> {
     try {
-      if (typeof MediaRecorder === "undefined") return null;
-      const srcW = video.videoWidth || overlayCanvas.width;
-      const srcH = video.videoHeight || overlayCanvas.height;
-      if (!srcW || !srcH) return null;
+      const created = createCanvasClipRecorder(video, overlayCanvas);
+      if (!created) return null;
 
-      const scale = Math.min(1, 640 / srcW);
-      const recCanvas = document.createElement("canvas");
-      recCanvas.width = Math.max(2, Math.round(srcW * scale));
-      recCanvas.height = Math.max(2, Math.round(srcH * scale));
-      const recCtx = recCanvas.getContext("2d");
-      if (!recCtx || typeof recCanvas.captureStream !== "function") return null;
-
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-        ? "video/webm;codecs=vp8"
-        : MediaRecorder.isTypeSupported("video/webm")
-          ? "video/webm"
-          : "";
-
-      const stream = recCanvas.captureStream(15);
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 900_000 })
-        : new MediaRecorder(stream);
-
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) chunks.push(ev.data);
-      };
-
-      const drawFrame = () => {
-        if (video.readyState >= 2) {
-          recCtx.drawImage(video, 0, 0, recCanvas.width, recCanvas.height);
-          recCtx.drawImage(overlayCanvas, 0, 0, recCanvas.width, recCanvas.height);
-        }
-      };
-
-      drawFrame();
-      const timerId = window.setInterval(drawFrame, 66);
-      const startedAt = Date.now();
+      const { recorder, stream, timerId, chunks, startedAt, mimeType } = created;
 
       const blob = await new Promise<Blob | null>((resolve) => {
         recorder.onstop = () => {
           window.clearInterval(timerId);
           stream.getTracks().forEach((t) => t.stop());
-          resolve(chunks.length > 0 ? new Blob(chunks, { type: mimeType || "video/webm" }) : null);
+          const effectiveType = mimeType || chunks[0]?.type || "video/webm";
+          resolve(chunks.length > 0 ? new Blob(chunks, { type: effectiveType }) : null);
         };
         recorder.onerror = () => {
           window.clearInterval(timerId);
           stream.getTracks().forEach((t) => t.stop());
           resolve(null);
         };
-        recorder.start(250);
         window.setTimeout(() => {
           if (recorder.state !== "inactive") {
             recorder.stop();
@@ -156,7 +342,7 @@ export function OnDeviceCamera({
 
       if (!blob || blob.size < 1024) return null;
       const durationSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
-      return { blob, durationSeconds };
+      return { blob, durationSeconds, mimeType: blob.type || mimeType || "video/webm" };
     } catch (err) {
       console.warn("Gagal merekam klip kamera device:", err);
       return null;
@@ -169,7 +355,16 @@ export function OnDeviceCamera({
     confidence: number,
   ) {
     try {
-      // Composite 1-frame snapshot (video + pose overlay) when a fall is confirmed
+      // Ambil activeClipRef segera jika sedang berjalan (pre-fall sejak SUSPECTED FALL)
+      const inFlightClip =
+        activeClipRef.current && !activeClipRef.current.isFinishing
+          ? activeClipRef.current
+          : null;
+      const clipPromise = inFlightClip
+        ? finishActiveClipRecording(inFlightClip, POST_FALL_RECORD_MS)
+        : null;
+
+      // Composite 1-frame snapshot (video + pose overlay) saat FALL DETECTED
       let thumbnailBlob: Blob | null = null;
       const snapCanvas = document.createElement("canvas");
       snapCanvas.width = video.videoWidth || overlayCanvas.width;
@@ -183,8 +378,10 @@ export function OnDeviceCamera({
         );
       }
 
-      // Rekam klip bukti 5 detik (video + overlay pose) jika didukung browser
-      const recordedClip = await recordClipBlob(video, overlayCanvas, 5000);
+      // Gunakan klip pre-fall (+3.5 dtk post-fall) atau fallback rekam 4.5 dtk jika belum aktif
+      const recordedClip = clipPromise
+        ? await clipPromise
+        : await recordClipBlob(video, overlayCanvas, FALLBACK_CLIP_DURATION_MS);
 
       const formData = new FormData();
       formData.append("camera_id", cameraId || "on-device");
@@ -198,7 +395,7 @@ export function OnDeviceCamera({
         formData.append("thumbnail", thumbnailBlob, "fall-snapshot.jpg");
       }
       if (recordedClip) {
-        formData.append("clip", recordedClip.blob, "fall-clip.webm");
+        formData.append("clip", recordedClip.blob, getClipFilename(recordedClip.mimeType));
       }
 
       await incidentApi.handleIncidentAlert(formData);
@@ -250,6 +447,17 @@ export function OnDeviceCamera({
           setStatus(result.status);
           setInferenceMs(result.inferenceMs);
           setPersonCount(result.detections.length);
+
+          if (result.status === "SUSPECTED FALL" && activeClipRef.current === null) {
+            startSuspectedClipRecording(video, canvas);
+          } else if (
+            result.status === "NORMAL" &&
+            activeClipRef.current !== null &&
+            !activeClipRef.current.isFinishing
+          ) {
+            cancelActiveClipRecording();
+          }
+
           if (result.fallTriggered) {
             setFallCount((prev) => prev + 1);
             try {
@@ -351,6 +559,7 @@ export function OnDeviceCamera({
       void startWebcam(initialFacingMode);
     }
     return () => {
+      cancelActiveClipRecording();
       stopLoopAndMedia(true);
       void detectorRef.current?.dispose();
     };

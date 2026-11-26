@@ -163,6 +163,66 @@ export async function addCamera(camera: { name: string; location: string; url: s
   }
 }
 
+export async function updateCamera(
+  id: string,
+  data: { name?: string; location?: string; url?: string },
+): Promise<SavedCamera | null> {
+  const current = readCachedCameras();
+  const target = current.find((c) => c.id === id);
+  if (!target) return null;
+
+  const normalizedUrl = data.url !== undefined ? normalizeCameraUrl(data.url) : target.url;
+  const nextProtocol = getCameraProtocol(normalizedUrl);
+  const isLocalDevice = id.startsWith("device-") || target.protocol === "DEVICE";
+
+  if (isLocalDevice && nextProtocol === "DEVICE") {
+    const updatedLocal: SavedCamera = {
+      ...target,
+      name: data.name ?? target.name,
+      location: data.location ?? target.location,
+      url: normalizedUrl,
+      protocol: "DEVICE",
+    };
+    writeCachedCameras(current.map((c) => (c.id === id ? updatedLocal : c)));
+    return updatedLocal;
+  }
+
+  if (isLocalDevice && nextProtocol !== "DEVICE") {
+    const created = await cameraApi.create({
+      name: data.name ?? target.name,
+      location: data.location ?? target.location,
+      url: normalizedUrl,
+    });
+    const formatted: SavedCamera = {
+      id: created.id,
+      name: created.name,
+      location: created.location,
+      url: normalizeCameraUrl(created.url),
+      protocol: created.protocol,
+      status: created.status,
+    };
+    writeCachedCameras(current.map((c) => (c.id === id ? formatted : c)));
+    return formatted;
+  }
+
+  const payload: { name?: string; location?: string; url?: string } = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.location !== undefined) payload.location = data.location;
+  if (data.url !== undefined) payload.url = normalizedUrl;
+
+  const updatedRemote = await cameraApi.update(id, payload);
+  const formatted: SavedCamera = {
+    id: updatedRemote.id,
+    name: updatedRemote.name,
+    location: updatedRemote.location,
+    url: normalizeCameraUrl(updatedRemote.url),
+    protocol: updatedRemote.protocol,
+    status: updatedRemote.status,
+  };
+  writeCachedCameras(current.map((c) => (c.id === id ? formatted : c)));
+  return formatted;
+}
+
 export async function updateCameraStatus(
   id: string,
   status: "online" | "offline",

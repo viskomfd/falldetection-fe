@@ -290,30 +290,28 @@ function PengaturanPage() {
               </Badge>
               <Badge
                 variant="secondary"
-                className={`rounded-full ${
-                  apiOnline === true
+                className={`rounded-full ${apiOnline === true
                     ? "bg-success/15 text-success"
                     : apiOnline === false
                       ? "bg-destructive/15 text-destructive"
                       : ""
-                }`}
+                  }`}
               >
                 {apiOnline === true
-                  ? "Server API Online"
+                  ? "Server Online"
                   : apiOnline === false
-                    ? "Server API Offline"
+                    ? "Server Offline"
                     : "Memeriksa Server..."}
               </Badge>
               <Badge
                 variant="secondary"
                 title={modelStatus?.message || modelStatus?.model_file}
-                className={`rounded-full ${
-                  modelStatus
+                className={`rounded-full ${modelStatus
                     ? modelStatus.is_model_loaded
                       ? "bg-success/15 text-success"
                       : "bg-destructive/15 text-destructive"
                     : ""
-                }`}
+                  }`}
               >
                 {modelStatus
                   ? modelStatus.is_model_loaded

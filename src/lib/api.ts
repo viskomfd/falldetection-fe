@@ -294,13 +294,21 @@ export const cameraApi = {
     });
   },
 
+  async update(
+    cameraId: string,
+    data: { name?: string; location?: string; url?: string },
+  ): Promise<Camera> {
+    return apiRequest<Camera>(`/api/cameras/${cameraId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
   async updateStatus(cameraId: string, status: "online" | "offline"): Promise<Camera> {
-    return apiRequest<Camera>(
-      `/api/cameras/${cameraId}/status?status=${encodeURIComponent(status)}`,
-      {
-        method: "PATCH",
-      },
-    );
+    return apiRequest<Camera>(`/api/cameras/${cameraId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
   },
 
   async delete(cameraId: string): Promise<{ message: string; id: string }> {
@@ -327,6 +335,28 @@ export const incidentApi = {
     return apiRequest<Incident>("/api/incidents", {
       method: "POST",
       body: JSON.stringify(incident),
+    });
+  },
+
+  async updateStatus(
+    incidentId: string,
+    status: "unresolved" | "acknowledged" | "resolved",
+  ): Promise<Incident> {
+    return apiRequest<Incident>(`/api/incidents/${incidentId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async delete(incidentId: string): Promise<{ message: string; id: string }> {
+    return apiRequest<{ message: string; id: string }>(`/api/incidents/${incidentId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async clearAll(): Promise<{ message: string; deleted_count: number }> {
+    return apiRequest<{ message: string; deleted_count: number }>("/api/incidents", {
+      method: "DELETE",
     });
   },
 

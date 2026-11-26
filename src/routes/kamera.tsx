@@ -5,6 +5,7 @@ import {
   Cctv,
   Loader2,
   MapPin,
+  Pencil,
   Plus,
   Power,
   RotateCcw,
@@ -31,11 +32,14 @@ import { Input } from "@/components/ui/input";
 import { modelApi } from "@/lib/api";
 import {
   addCamera,
+  fetchCameras,
   getDeviceFacingMode,
   removeCamera,
+  updateCamera,
   updateCameraStatus,
   useSavedCameras,
   type DeviceFacingMode,
+  type SavedCamera,
 } from "@/lib/cameras";
 
 type CameraSourceType = "stream" | "device";
@@ -167,8 +171,12 @@ export const Route = createFileRoute("/kamera")({
 function KameraPage() {
   const savedCameras = useSavedCameras();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCamera, setEditingCamera] = useState<SavedCamera | null>(null);
   const [sourceType, setSourceType] = useState<CameraSourceType>("stream");
   const [deviceFacing, setDeviceFacing] = useState<DeviceFacingMode>("environment");
+  const [cameraName, setCameraName] = useState("");
+  const [cameraLocation, setCameraLocation] = useState("");
+  const [cameraUrl, setCameraUrl] = useState("");
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -177,25 +185,57 @@ function KameraPage() {
   const [resettingTrackers, setResettingTrackers] = useState(false);
   const [trackerStatus, setTrackerStatus] = useState("");
 
+  useEffect(() => {
+    const pollTimer = window.setInterval(() => {
+      void fetchCameras();
+    }, 12_000);
+    return () => window.clearInterval(pollTimer);
+  }, []);
+
+  function resetDialogForm() {
+    setEditingCamera(null);
+    setFormError("");
+    setSourceType("stream");
+    setDeviceFacing("environment");
+    setCameraName("");
+    setCameraLocation("");
+    setCameraUrl("");
+  }
+
   function handleDialogOpenChange(open: boolean) {
     setDialogOpen(open);
     if (!open) {
-      setFormError("");
+      resetDialogForm();
+    }
+  }
+
+  function handleOpenCreate() {
+    resetDialogForm();
+    setDialogOpen(true);
+  }
+
+  function handleOpenEdit(camera: SavedCamera) {
+    setEditingCamera(camera);
+    setFormError("");
+    setCameraName(camera.name);
+    setCameraLocation(camera.location);
+    if (camera.protocol === "DEVICE") {
+      setSourceType("device");
+      setDeviceFacing(getDeviceFacingMode(camera.url));
+      setCameraUrl("");
+    } else {
       setSourceType("stream");
       setDeviceFacing("environment");
+      setCameraUrl(camera.url);
     }
+    setDialogOpen(true);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    const name = String(form.get("name") ?? "").trim();
-    const location = String(form.get("location") ?? "").trim();
-    const url =
-      sourceType === "device"
-        ? `device://${deviceFacing}`
-        : String(form.get("url") ?? "").trim();
+    const name = cameraName.trim();
+    const location = cameraLocation.trim();
+    const url = sourceType === "device" ? `device://${deviceFacing}` : cameraUrl.trim();
 
     if (!name || !location || !url) {
       setFormError("Semua kolom harus diisi.");
@@ -205,11 +245,20 @@ function KameraPage() {
     try {
       setIsSubmitting(true);
       setFormError("");
-      await addCamera({ name, location, url });
-      formEl.reset();
+      if (editingCamera) {
+        await updateCamera(editingCamera.id, { name, location, url });
+      } else {
+        await addCamera({ name, location, url });
+      }
       handleDialogOpenChange(false);
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Kamera gagal ditambahkan");
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : editingCamera
+            ? "Kamera gagal diperbarui"
+            : "Kamera gagal ditambahkan",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -281,14 +330,14 @@ function KameraPage() {
             </Button>
             <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
               <DialogTrigger asChild>
-                <Button className="w-full rounded-full sm:w-auto">
+                <Button className="w-full rounded-full sm:w-auto" onClick={handleOpenCreate}>
                   <Plus className="size-4" />
                   Tambah Kamera
                 </Button>
               </DialogTrigger>
             <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl border-border bg-card sm:max-w-xl">
               <DialogHeader>
-                <DialogTitle>Tambah kamera baru</DialogTitle>
+                <DialogTitle>{editingCamera ? "Edit kamera" : "Tambah kamera baru"}</DialogTitle>
                 <DialogDescription>
                   {sourceType === "stream"
                     ? "Untuk IP Webcam Android, gunakan alamat video yang ditampilkan aplikasi, biasanya http://IP-HP:8080/video."
@@ -339,6 +388,8 @@ function KameraPage() {
                   <Input
                     id="camera-name"
                     name="name"
+                    value={cameraName}
+                    onChange={(event) => setCameraName(event.target.value)}
                     placeholder={
                       sourceType === "device" ? "cth. Webcam Laptop" : "cth. Kamera Android"
                     }
@@ -354,6 +405,8 @@ function KameraPage() {
                   <Input
                     id="camera-location"
                     name="location"
+                    value={cameraLocation}
+                    onChange={(event) => setCameraLocation(event.target.value)}
                     placeholder="cth. Ruang Keluarga"
                     className="rounded-xl bg-muted"
                     required
@@ -369,6 +422,8 @@ function KameraPage() {
                       id="camera-url"
                       name="url"
                       type="url"
+                      value={cameraUrl}
+                      onChange={(event) => setCameraUrl(event.target.value)}
                       placeholder="http://192.168.1.10:8080/video"
                       className="rounded-xl bg-muted font-mono text-xs"
                       required
@@ -422,7 +477,11 @@ function KameraPage() {
                 <DialogFooter>
                   <Button type="submit" className="rounded-full" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-                    {isSubmitting ? "Menyimpan..." : "Tambahkan Kamera"}
+                    {isSubmitting
+                      ? "Menyimpan..."
+                      : editingCamera
+                        ? "Simpan Perubahan"
+                        : "Tambahkan Kamera"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -477,6 +536,11 @@ function KameraPage() {
                       url={camera.url}
                       protocol={camera.protocol}
                       status={camera.status}
+                      onStatusChange={(nextStatus) => {
+                        if (camera.status !== nextStatus) {
+                          void updateCameraStatus(camera.id, nextStatus).catch(() => {});
+                        }
+                      }}
                     />
                     <span className="camera-live-only absolute left-3 top-3">
                       <Badge className="rounded-full bg-primary">
@@ -509,7 +573,17 @@ function KameraPage() {
                     <p className="truncate rounded-xl bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
                       {sourceLabel}
                     </p>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full bg-card"
+                        onClick={() => handleOpenEdit(camera)}
+                      >
+                        <Pencil className="size-4" />
+                        Edit
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"

@@ -8,6 +8,7 @@ import {
   Gauge,
   RadioTower,
   Siren,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -19,14 +20,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   dashboardApi,
+  incidentApi,
   modelApi,
   resolveMediaUrl,
   type DashboardStats,
   type Incident,
   type ModelStatus,
 } from "@/lib/api";
-import { useSavedCameras } from "@/lib/cameras";
+import { fetchCameras, updateCameraStatus, useSavedCameras } from "@/lib/cameras";
 import { useElderlyName } from "@/lib/elderly-profile";
+import { markIncidentsRead } from "@/lib/incident-unread";
 import { getNotificationPreferences } from "@/lib/notification-preferences";
 
 export const Route = createFileRoute("/dashboard")({
@@ -81,21 +84,26 @@ function Dashboard() {
   const notificationPreferences = getNotificationPreferences();
 
   useEffect(() => {
-    // 1. Fetch dashboard stats & AI model status
-    dashboardApi
-      .summary()
-      .then((data) => {
-        setStats(data);
-        if (data.latest_incident) {
-          setActiveAlert(data.latest_incident);
-        }
-      })
-      .catch((err) => console.warn("Could not fetch dashboard summary:", err));
+    const refreshDashboard = () => {
+      dashboardApi
+        .summary()
+        .then((data) => {
+          setStats(data);
+          setActiveAlert(data.latest_incident ?? null);
+        })
+        .catch((err) => console.warn("Could not fetch dashboard summary:", err));
+
+      void fetchCameras();
+    };
+
+    refreshDashboard();
 
     modelApi
       .status()
       .then((status) => setModelStatus(status))
       .catch((err) => console.warn("Could not fetch model status:", err));
+
+    const pollTimer = window.setInterval(refreshDashboard, 12_000);
 
     const handleFallEvent = (e: Event) => {
       const customEvent = e as CustomEvent<Incident>;
@@ -120,9 +128,24 @@ function Dashboard() {
     window.addEventListener("rumi:fall-alert", handleFallEvent);
 
     return () => {
+      window.clearInterval(pollTimer);
       window.removeEventListener("rumi:fall-alert", handleFallEvent);
     };
   }, []);
+
+  function handleAcknowledgeAlert(markRead = false) {
+    if (!activeAlert) return;
+    const alertId = activeAlert.id;
+    setActiveAlert(null);
+    if (markRead) {
+      markIncidentsRead();
+    }
+    if (alertId) {
+      void incidentApi
+        .updateStatus(alertId, "acknowledged")
+        .catch((err) => console.warn("Gagal memperbarui status insiden:", err));
+    }
+  }
 
   const localDeviceCamerasCount = savedCameras.filter((c) => c.protocol === "DEVICE").length;
   const totalCameras =
@@ -179,9 +202,22 @@ function Dashboard() {
                 dalam {alertResponseTime} detik.
               </p>
             </div>
-            <Button asChild variant="outline" className="w-full rounded-full bg-card sm:w-auto">
-              <Link to="/riwayat">Lihat Detail</Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" className="w-full rounded-full bg-card sm:w-auto">
+                <Link to="/riwayat" onClick={() => handleAcknowledgeAlert(true)}>
+                  Lihat Detail
+                </Link>
+              </Button>
+              <button
+                type="button"
+                onClick={() => handleAcknowledgeAlert(false)}
+                aria-label="Tutup banner notifikasi"
+                title="Tutup notifikasi"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </section>
         )}
 
@@ -215,6 +251,11 @@ function Dashboard() {
                       url={camera.url}
                       protocol={camera.protocol}
                       status={camera.status}
+                      onStatusChange={(nextStatus) => {
+                        if (camera.status !== nextStatus) {
+                          void updateCameraStatus(camera.id, nextStatus).catch(() => {});
+                        }
+                      }}
                     />
                     {!isOffline && (camera.protocol === "HTTP" || camera.protocol === "DEVICE") && (
                       <div className="camera-live-only absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground">

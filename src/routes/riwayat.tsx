@@ -1,8 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, ChevronDown, ExternalLink, Loader2, Play, ZoomIn } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Play,
+  Trash2,
+  ZoomIn,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -69,6 +87,10 @@ function RiwayatPage() {
   const [locationFilter, setLocationFilter] = useState("all");
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [previewSnapshot, setPreviewSnapshot] = useState<Incident | null>(null);
+  const [deletingTarget, setDeletingTarget] = useState<Incident | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   async function loadIncidents() {
     try {
@@ -100,15 +122,75 @@ function RiwayatPage() {
     void loadIncidents();
   }
 
+  async function handleConfirmDeleteSingle() {
+    if (!deletingTarget) return;
+    const targetId = deletingTarget.id;
+    setDeleteError("");
+    try {
+      setIsDeleting(true);
+      await incidentApi.delete(targetId);
+      setIncidents((prev) => prev.filter((item) => item.id !== targetId));
+      if (selectedIncident?.id === targetId) setSelectedIncident(null);
+      if (previewSnapshot?.id === targetId) setPreviewSnapshot(null);
+      setDeletingTarget(null);
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : "Gagal menghapus riwayat insiden.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleConfirmClearAll() {
+    setDeleteError("");
+    try {
+      setIsDeleting(true);
+      await incidentApi.clearAll();
+      setIncidents([]);
+      setSelectedIncident(null);
+      setPreviewSnapshot(null);
+      setConfirmClearAll(false);
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : "Gagal membersihkan semua riwayat insiden.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <div className="px-2">
-          <h2 className="text-xl font-extrabold text-foreground">Riwayat Deteksi Jatuh</h2>
-          <p className="text-sm text-muted-foreground">
-            Semua insiden yang tercatat oleh sistem, lengkap dengan bukti snapshot.
-          </p>
+        <div className="flex flex-col items-stretch gap-3 px-1 sm:flex-row sm:items-center sm:justify-between sm:px-2">
+          <div>
+            <h2 className="text-xl font-extrabold text-foreground">Riwayat Deteksi Jatuh</h2>
+            <p className="text-sm text-muted-foreground">
+              Semua insiden yang tercatat oleh sistem, lengkap dengan bukti snapshot.
+            </p>
+          </div>
+          {incidents.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full rounded-full border-destructive/30 bg-card text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
+              onClick={() => {
+                setDeleteError("");
+                setConfirmClearAll(true);
+              }}
+            >
+              <Trash2 className="size-4" />
+              Bersihkan Semua Riwayat
+            </Button>
+          )}
         </div>
+
+        {deleteError && (
+          <p role="alert" className="px-2 text-xs font-semibold text-destructive">
+            {deleteError}
+          </p>
+        )}
 
         {/* Filters */}
         <section className="card-shadow grid gap-4 rounded-3xl bg-card p-4 sm:grid-cols-2 sm:p-5 lg:flex lg:items-end">
@@ -184,6 +266,7 @@ function RiwayatPage() {
                     <th className="px-5 py-4 font-bold">Lansia</th>
                     <th className="px-5 py-4 font-bold">Kamera / Lokasi</th>
                     <th className="px-5 py-4 font-bold">Klip</th>
+                    <th className="px-5 py-4 text-right font-bold">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="block md:table-row-group">
@@ -271,6 +354,21 @@ function RiwayatPage() {
                             {incident.clip_url
                               ? incident.clip_duration || "Putar"
                               : "Tidak tersedia"}
+                          </Button>
+                        </td>
+                        <td className="col-span-2 flex justify-end pt-2 md:table-cell md:px-5 md:py-3 md:text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-auto rounded-full bg-card px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => {
+                              setDeleteError("");
+                              setDeletingTarget(incident);
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Hapus
                           </Button>
                         </td>
                       </tr>
@@ -367,6 +465,78 @@ function RiwayatPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Modal Konfirmasi Hapus 1 Riwayat */}
+        <AlertDialog
+          open={Boolean(deletingTarget)}
+          onOpenChange={(open) => {
+            if (!open && !isDeleting) setDeletingTarget(null);
+          }}
+        >
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Hapus riwayat insiden?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Riwayat kejadian di{" "}
+                <span className="font-semibold text-foreground">
+                  {deletingTarget?.camera_name || deletingTarget?.location || "kamera ini"}
+                </span>{" "}
+                ({formatIncidentDate(deletingTarget?.detected_at).dateStr}{" "}
+                {formatIncidentDate(deletingTarget?.detected_at).timeStr}) beserta snapshot dan klip
+                buktinya akan dihapus permanen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-full" disabled={isDeleting}>
+                Batal
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleConfirmDeleteSingle();
+                }}
+                disabled={isDeleting}
+                className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Hapus
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Modal Konfirmasi Bersihkan Semua Riwayat */}
+        <AlertDialog
+          open={confirmClearAll}
+          onOpenChange={(open) => {
+            if (!open && !isDeleting) setConfirmClearAll(false);
+          }}
+        >
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bersihkan semua riwayat insiden?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Semua catatan insiden beserta file snapshot dan klip video terkait akan dihapus
+                permanen dan tidak dapat dikembalikan.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-full" disabled={isDeleting}>
+                Batal
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleConfirmClearAll();
+                }}
+                disabled={isDeleting}
+                className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Hapus Semua
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppShell>
   );
