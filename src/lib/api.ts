@@ -282,6 +282,20 @@ export interface HealthStatus {
   version?: string;
 }
 
+export interface VapidPublicKeyResponse {
+  public_key: string;
+  enabled: boolean;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  user_agent?: string;
+}
+
 export const cameraApi = {
   async list(): Promise<Camera[]> {
     return apiRequest<Camera[]>("/api/cameras");
@@ -395,5 +409,29 @@ export const modelApi = {
 export const healthApi = {
   async check(): Promise<HealthStatus> {
     return apiRequest<HealthStatus>("/");
+  },
+};
+
+export const pushApi = {
+  async getVapidPublicKey(): Promise<VapidPublicKeyResponse> {
+    return apiRequest<VapidPublicKeyResponse>("/api/push/vapid-public-key");
+  },
+
+  async subscribe(payload: PushSubscriptionPayload): Promise<{ status: string; endpoint: string }> {
+    return apiRequest("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async unsubscribe(endpoint: string): Promise<{ status: string; removed: boolean }> {
+    return apiRequest("/api/push/subscribe", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+    });
+  },
+
+  async sendTest(): Promise<{ message: string; sent: number; failed: number; removed: number }> {
+    return apiRequest("/api/push/test", { method: "POST" });
   },
 };

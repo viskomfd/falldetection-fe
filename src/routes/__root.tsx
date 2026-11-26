@@ -85,6 +85,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Dashboard pendamping untuk memantau kamera CCTV, menerima fall alert real-time, dan mengelola riwayat deteksi jatuh.",
       },
       { name: "author", content: "Rumi" },
+      { name: "theme-color", content: "#0f766e" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "Rumi" },
       { property: "og:title", content: "Rumi | Sistem Deteksi Jatuh & Monitoring CCTV" },
       {
         property: "og:description",
@@ -107,6 +111,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "icon", href: "/icon.png", type: "image/png" },
       { rel: "apple-touch-icon", href: "/icon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,

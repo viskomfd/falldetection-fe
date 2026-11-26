@@ -2,11 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   BellRing,
   Cctv,
+  CheckCircle2,
+  Download,
   HeartHandshake,
   Loader2,
   Lock,
   Mail,
   RotateCcw,
+  Share,
   Siren,
   Smartphone,
 } from "lucide-react";
@@ -26,14 +29,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { playFallAlarm, requestDesktopNotificationPermission } from "@/lib/alarm";
-import { authApi, getUser, healthApi, modelApi, type ModelStatus, type User } from "@/lib/api";
+import { playFallAlarm } from "@/lib/alarm";
+import {
+  authApi,
+  getUser,
+  healthApi,
+  modelApi,
+  pushApi,
+  type ModelStatus,
+  type User,
+} from "@/lib/api";
 import { getElderlyName, saveElderlyName } from "@/lib/elderly-profile";
 import {
   getNotificationPreferences,
   saveNotificationPreferences,
   type NotificationPreferences,
 } from "@/lib/notification-preferences";
+import {
+  isIosDevice,
+  isStandalonePwa,
+  subscribeToWebPush,
+  unsubscribeFromWebPush,
+  type BeforeInstallPromptEvent,
+} from "@/lib/push-notifications";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
@@ -70,8 +88,8 @@ const NOTIFICATIONS = [
   },
   {
     id: "desktop",
-    title: "Notifikasi Desktop Browser",
-    description: "Tampilkan notifikasi sistem saat dashboard sedang terbuka.",
+    title: "Notifikasi Push / Desktop (24/7)",
+    description: "Terima notifikasi sistem meski browser atau aplikasi PWA ditutup.",
   },
 ] satisfies Array<{
   id: keyof NotificationPreferences;
@@ -98,8 +116,14 @@ function PengaturanPage() {
     getNotificationPreferences(),
   );
   const [notificationError, setNotificationError] = useState("");
+  const [updatingPush, setUpdatingPush] = useState(false);
   const [testingNotification, setTestingNotification] = useState(false);
   const [notificationTestStatus, setNotificationTestStatus] = useState("");
+  const [deferredInstallPrompt, setDeferredInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isPwaInstalled, setIsPwaInstalled] = useState(false);
+  const [iosGuideOpen, setIosGuideOpen] = useState(false);
+  const [pwaInstallHint, setPwaInstallHint] = useState("");
   const [simulatingFall, setSimulatingFall] = useState(false);
   const [simulateFallStatus, setSimulateFallStatus] = useState("");
   const [resettingTrackers, setResettingTrackers] = useState(false);
@@ -131,9 +155,31 @@ function PengaturanPage() {
       .catch(() => setModelStatus(null));
   }, []);
 
+  useEffect(() => {
+    setIsPwaInstalled(isStandalonePwa());
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleAppInstalled = () => {
+      setIsPwaInstalled(true);
+      setDeferredInstallPrompt(null);
+      setPwaInstallHint("");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
   async function handleLogoutAll() {
     setLogoutError("");
     try {
+      await unsubscribeFromWebPush().catch(() => undefined);
       await authApi.logoutAll();
       window.location.href = "/login";
     } catch (error) {
@@ -188,17 +234,62 @@ function PengaturanPage() {
     }
   }
 
-  async function handleNotificationChange(id: keyof NotificationPreferences, checked: boolean) {
-    setNotificationError("");
-    if (id === "desktop" && checked && !window.isSecureContext) {
-      setNotificationError(
-        "Notifikasi sistem memerlukan HTTPS. Alamat HTTP melalui IP lokal tidak dapat meminta izin browser.",
-      );
+  async function handleInstallPwa() {
+    setPwaInstallHint("");
+    if (deferredInstallPrompt) {
+      try {
+        await deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        setDeferredInstallPrompt(null);
+        if (choice.outcome === "accepted") {
+          setIsPwaInstalled(true);
+        }
+      } catch {
+        setPwaInstallHint("Gagal membuka dialog instalasi. Coba pasang melalui menu browser.");
+      }
       return;
     }
-    if (id === "desktop" && checked && !(await requestDesktopNotificationPermission())) {
-      setNotificationError("Izin notifikasi browser ditolak. Aktifkan melalui pengaturan browser.");
+
+    if (isIosDevice()) {
+      setIosGuideOpen(true);
       return;
+    }
+
+    setPwaInstallHint(
+      "Buka menu browser Anda lalu pilih 'Install App' / 'Tambah ke Layar Utama' / 'Add to Dock' untuk memasang PWA Rumi.",
+    );
+  }
+
+  async function handleNotificationChange(id: keyof NotificationPreferences, checked: boolean) {
+    setNotificationError("");
+    if (id === "desktop") {
+      if (checked) {
+        if (isIosDevice() && !isStandalonePwa()) {
+          setNotificationError(
+            "Di iPhone/iPad, notifikasi push 24/7 wajib dibuka dari aplikasi Rumi di Layar Utama (Home Screen).",
+          );
+          setIosGuideOpen(true);
+          return;
+        }
+        setUpdatingPush(true);
+        try {
+          await subscribeToWebPush();
+        } catch (error) {
+          setNotificationError(
+            error instanceof Error ? error.message : "Gagal mengaktifkan notifikasi push.",
+          );
+          return;
+        } finally {
+          setUpdatingPush(false);
+        }
+      } else {
+        setUpdatingPush(true);
+        try {
+          await unsubscribeFromWebPush().catch(() => undefined);
+        } finally {
+          setUpdatingPush(false);
+        }
+      }
     }
     if (id === "sound" && checked) playFallAlarm();
     const next = { ...notificationPreferences, [id]: checked };
@@ -211,7 +302,20 @@ function PengaturanPage() {
     setNotificationTestStatus("");
     try {
       const result = await authApi.testNotification();
-      setNotificationTestStatus(result.message);
+      let statusMessage = result.message;
+
+      if (notificationPreferences.desktop) {
+        try {
+          const pushResult = await pushApi.sendTest();
+          statusMessage = `${result.message} · Web Push: ${pushResult.message || `${pushResult.sent} perangkat terkirim`}`;
+        } catch (pushErr) {
+          const pushErrMsg =
+            pushErr instanceof Error ? pushErr.message : "Web Push uji gagal dikirim";
+          statusMessage = `${result.message} (Web Push: ${pushErrMsg})`;
+        }
+      }
+
+      setNotificationTestStatus(statusMessage);
     } catch (error) {
       setNotificationTestStatus(
         error instanceof Error ? error.message : "Notifikasi uji gagal dikirim.",
@@ -391,6 +495,40 @@ function PengaturanPage() {
           {/* Notifications */}
           <section className="card-shadow flex flex-col gap-4 rounded-3xl bg-card p-4 sm:p-6">
             <h3 className="font-bold text-foreground">Notifikasi Fall Alert</h3>
+            <div className="flex flex-col gap-2.5 rounded-2xl bg-muted p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-foreground">Aplikasi Notifikasi 24/7 (PWA)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Pasang Rumi di perangkat Anda agar alert tetap masuk meski browser ditutup.
+                  </p>
+                </div>
+                {isPwaInstalled && (
+                  <Badge className="gap-1.5 rounded-full bg-success/15 text-success hover:bg-success/15">
+                    <CheckCircle2 className="size-3.5" />
+                    PWA Terpasang ✓ · Notifikasi aktif meski app ditutup
+                  </Badge>
+                )}
+              </div>
+              {!isPwaInstalled && (
+                <div className="flex flex-col items-start gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => void handleInstallPwa()}
+                  >
+                    <Download className="size-4" />
+                    Install PWA untuk Notifikasi 24/7
+                  </Button>
+                  {pwaInstallHint && (
+                    <p role="status" className="text-xs text-muted-foreground">
+                      {pwaInstallHint}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             {NOTIFICATIONS.map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-4">
                 <div>
@@ -399,6 +537,7 @@ function PengaturanPage() {
                 </div>
                 <Switch
                   checked={notificationPreferences[item.id]}
+                  disabled={item.id === "desktop" && updatingPush}
                   onCheckedChange={(checked) => void handleNotificationChange(item.id, checked)}
                   aria-label={item.title}
                 />
@@ -645,6 +784,56 @@ function PengaturanPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={iosGuideOpen} onOpenChange={setIosGuideOpen}>
+          <DialogContent className="max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Pasang Rumi di iPhone / iPad</DialogTitle>
+              <DialogDescription>
+                Ikuti 2 langkah berikut di Safari agar notifikasi fall alert 24/7 aktif di perangkat
+                iOS Anda.
+              </DialogDescription>
+            </DialogHeader>
+            <ol className="flex flex-col gap-3 text-sm text-foreground">
+              <li className="flex items-start gap-3 rounded-2xl bg-muted p-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  1
+                </span>
+                <div>
+                  <p className="font-semibold">
+                    Ketuk tombol <span className="inline-flex items-center gap-1 font-bold">Share <Share className="inline size-3.5" /></span> di bar Safari
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Ikon kotak dengan panah ke atas di bagian bawah layar Safari.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 rounded-2xl bg-muted p-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  2
+                </span>
+                <div>
+                  <p className="font-semibold">
+                    Pilih &quot;Add to Home Screen&quot; (Tambah ke Layar Utama)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Setelah terpasang, buka aplikasi Rumi dari ikon di Layar Utama lalu aktifkan
+                    Notifikasi Push.
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <DialogFooter>
+              <Button
+                type="button"
+                className="rounded-full"
+                onClick={() => setIosGuideOpen(false)}
+              >
+                Mengerti
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

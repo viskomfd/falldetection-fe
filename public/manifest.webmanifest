@@ -1,0 +1,19 @@
+{
+  "name": "Rumi — Deteksi Jatuh Lansia",
+  "short_name": "Rumi",
+  "description": "Pemantauan kamera & notifikasi darurat kejadian jatuh lansia secara real-time.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

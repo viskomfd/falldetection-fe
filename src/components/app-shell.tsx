@@ -32,6 +32,7 @@ import {
   useUnreadIncidents,
 } from "@/lib/incident-unread";
 import { getNotificationPreferences } from "@/lib/notification-preferences";
+import { subscribeToWebPush, unsubscribeFromWebPush } from "@/lib/push-notifications";
 
 const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -65,6 +66,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       .check()
       .then(() => setApiOnline(true))
       .catch(() => setApiOnline(false));
+    // Sync Web Push subscription silently if desktop push is enabled and permitted
+    if (
+      getNotificationPreferences().desktop &&
+      typeof Notification !== "undefined" &&
+      Notification.permission === "granted"
+    ) {
+      void subscribeToWebPush().catch(() => undefined);
+    }
     // Sync current user profile from backend
     authApi
       .getMe()
@@ -142,7 +151,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [elderlyName, isAuthenticated]);
 
-  function handleLogout() {
+  async function handleLogout() {
+    await unsubscribeFromWebPush().catch(() => undefined);
     authApi.logout();
     void navigate({ to: "/login" });
   }
