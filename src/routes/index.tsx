@@ -1,28 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   BellRing,
   Camera,
-  Cctv,
   Check,
   ChevronRight,
   Expand,
   Eye,
   History,
-  House,
-  ListFilter,
   MapPin,
+  Pause,
   Play,
   Radio,
-  ScanLine,
   ShieldCheck,
   Siren,
   Video,
 } from "lucide-react";
 
+import fallSnapshot from "@/assets/fall-snapshot.jpg";
 import feedBedroom from "@/assets/feed-bedroom.jpg";
 import feedKitchen from "@/assets/feed-kitchen.jpg";
-import feedLivingRoom from "@/assets/feed-living-room.jpg";
-import fallSnapshot from "@/assets/fall-snapshot.jpg";
 import landingCameraPhone from "@/assets/landing-camera-phone.png";
 import landingDashboardTablet from "@/assets/landing-dashboard-tablet.png";
 import landingFallDetection from "@/assets/landing-fall-detection.png";
@@ -58,118 +55,121 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const BENEFITS = [
-  {
-    icon: ScanLine,
-    title: "Indikasi jatuh",
-    description: "Simulasi visi komputer mengenali pola gerak dari feed kamera.",
-  },
-  {
-    icon: BellRing,
-    title: "Notifikasi terpusat",
-    description: "Lokasi, waktu, dan snapshot insiden tampil dalam satu konteks.",
-  },
-  {
-    icon: Cctv,
-    title: "Kamera yang sudah ada",
-    description: "Tambahkan sumber HTTP/MJPEG tanpa sensor yang dikenakan pengguna.",
-  },
-  {
-    icon: History,
-    title: "Bukti kejadian",
-    description: "Tinjau kembali snapshot berdasarkan waktu dan lokasi kamera.",
-  },
-];
+type FeatureTab = "pantau" | "notifikasi" | "riwayat";
 
-const STEPS = [
-  {
-    icon: Camera,
-    title: "Hubungkan kamera",
-    text: "Tambahkan nama, lokasi, dan URL IP camera dari jaringan rumah.",
-  },
-  {
-    icon: Eye,
-    title: "Pantau beberapa ruang",
-    text: "Lihat feed, status koneksi, dan lokasi kamera dari satu dashboard.",
-  },
-  {
-    icon: Siren,
-    title: "Lihat indikasi insiden",
-    text: "Notifikasi menampilkan snapshot, waktu, dan kamera sumber.",
-  },
-  {
-    icon: History,
-    title: "Tinjau bukti",
-    text: "Buka riwayat untuk melihat kembali detail kejadian yang tersimpan.",
-  },
+const WORKFLOW_STEPS = [
+  { icon: Camera, title: "Hubungkan kamera", detail: "IP camera HTTP/RTSP atau kamera HP" },
+  { icon: Eye, title: "Pantau ruang", detail: "Grid multi-kamera dari satu layar" },
+  { icon: Siren, title: "Terima alert", detail: "Lokasi, waktu, dan alarm langsung" },
+  { icon: History, title: "Tinjau bukti", detail: "Snapshot dan klip sekitar insiden" },
 ];
 
 const FAQS = [
   {
     q: "Apakah Rumi sudah mendeteksi jatuh secara nyata?",
-    a: "Rumi memproses feed kamera melalui model deteksi jatuh di backend. Akurasi deteksi tetap dipengaruhi kualitas video, sudut kamera, pencahayaan, dan kondisi jaringan.",
+    a: "Ya. Rumi memproses stream CCTV melalui model deteksi jatuh di backend, serta mendukung deteksi langsung di browser untuk kamera perangkat menggunakan YOLO11-Pose ONNX. Akurasi tetap dipengaruhi kualitas video, sudut kamera, pencahayaan, dan jaringan.",
   },
   {
     q: "Kamera apa yang dapat ditambahkan?",
-    a: "Rumi menerima URL HTTP, HTTPS, dan RTSP. HTTP/MJPEG dapat diputar langsung jika jaringan dan browser mengizinkan. RTSP memerlukan media gateway agar dapat diputar di browser.",
+    a: "Rumi menerima URL HTTP, HTTPS, dan RTSP, atau langsung memakai kamera HP/laptop di browser. HTTP/MJPEG dapat diputar langsung jika jaringan dan browser mengizinkan, sedangkan RTSP memerlukan media gateway agar dapat diputar di browser.",
   },
   {
     q: "Apakah Rumi menggantikan pendamping atau layanan darurat?",
-    a: "Tidak. Rumi diposisikan sebagai alat monitoring dan notifikasi, bukan perangkat medis, diagnosis klinis, atau layanan dispatch darurat.",
+    a: "Tidak. Rumi diposisikan sebagai alat bantu monitoring dan notifikasi, bukan perangkat medis, diagnosis klinis, atau layanan dispatch darurat.",
   },
   {
-    q: "Di mana data kamera disimpan?",
+    q: "Di mana data kamera dan riwayat disimpan?",
     a: "Data kamera, profil lansia, dan riwayat insiden dikelola melalui backend Rumi agar tetap tersedia saat akun dibuka dari perangkat lain.",
   },
 ];
 
-function BrowserBar({ path }: { path: string }) {
-  return (
-    <div className="flex h-9 items-center gap-2 border-b border-white/10 bg-white/[0.04] px-3">
-      <div className="flex gap-1.5">
-        <span className="size-2 rounded-full bg-[#ff6b61]" />
-        <span className="size-2 rounded-full bg-[#f7bd52]" />
-        <span className="size-2 rounded-full bg-[#66d6ac]" />
-      </div>
-      <div className="mx-auto flex h-5 w-[62%] items-center justify-center rounded-full bg-white/[0.06] text-[8px] text-white/35">
-        app.rumi.id/{path}
-      </div>
-    </div>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[#0d7166]/15 bg-white/75 px-3 py-1.5 text-xs font-bold text-[#0d7166] shadow-sm backdrop-blur">
-      <span className="size-1.5 rounded-full bg-[#0d7166] shadow-[0_0_10px_#65cfb8]" />
-      {children}
-    </span>
-  );
-}
-
 function Landing() {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const simVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [activeTab, setActiveTab] = useState<FeatureTab>("pantau");
+  const [videoPlaying, setVideoPlaying] = useState(true);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === "undefined") return;
+
+    root.classList.add("rumi-motion-ready");
+    const targets = Array.from(root.querySelectorAll<HTMLElement>(".rumi-reveal"));
+    if (targets.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.setAttribute("data-visible", "true");
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -32px 0px" },
+    );
+
+    for (const el of targets) {
+      observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const video = simVideoRef.current;
+    if (!video || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+        if (entry.isIntersecting && videoPlaying) {
+          void video.play().catch(() => undefined);
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0.3 },
+    );
+
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [videoPlaying]);
+
+  function handleToggleVideo() {
+    const video = simVideoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      setVideoPlaying(true);
+      void video.play().catch(() => undefined);
+    } else {
+      setVideoPlaying(false);
+      video.pause();
+    }
+  }
+
   return (
-    <div className="rumi-night min-h-screen overflow-hidden bg-[#f7fbf9] text-[#0a3934]">
-      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between rounded-full border border-[#d8e9e4] bg-white/85 px-3 py-2 shadow-[0_12px_40px_-24px_#0d716680] backdrop-blur-xl sm:px-5">
-          <a href="#beranda" aria-label="Rumi, kembali ke beranda">
-            <BrandLogo imageClassName="size-9" textClassName="text-[#0d7166]" />
+    <div ref={rootRef} className="rumi-night min-h-dvh overflow-x-clip bg-[#f7fbf9] text-[#0a3934]">
+      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-3">
+        <nav
+          aria-label="Navigasi utama"
+          className="mx-auto flex max-w-6xl items-center justify-between rounded-full border border-[#d8e9e4] bg-white/95 px-3 py-2 shadow-[0_10px_30px_-22px_#0d716680] backdrop-blur-md sm:px-5 md:grid md:grid-cols-[1fr_auto_1fr]"
+        >
+          <a href="#beranda" aria-label="Rumi, kembali ke beranda" className="justify-self-start">
+            <BrandLogo imageClassName="size-8" textClassName="text-[#0d7166]" />
           </a>
-          <div className="hidden items-center gap-8 text-xs font-semibold text-[#55736d] md:flex">
+          <div className="hidden items-center justify-self-center gap-7 text-sm font-semibold text-[#335952] md:flex">
             <a href="#simulasi" className="transition-colors hover:text-[#0d7166]">
               Simulasi
             </a>
             <a href="#fitur" className="transition-colors hover:text-[#0d7166]">
               Fitur
             </a>
-            <a href="#cara-kerja" className="transition-colors hover:text-[#0d7166]">
-              Cara kerja
-            </a>
             <a href="#faq" className="transition-colors hover:text-[#0d7166]">
               FAQ
             </a>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-self-end gap-2">
             <Button
               asChild
               variant="ghost"
@@ -190,26 +190,25 @@ function Landing() {
       </header>
 
       <main>
+        {/* 1. COMPACT HERO */}
         <section
           id="beranda"
-          className="rumi-night-hero relative min-h-[960px] px-4 pb-28 pt-36 sm:pt-44"
+          className="rumi-night-hero relative px-4 pb-10 pt-24 sm:pb-12 sm:pt-28"
         >
-          <div className="rumi-aurora rumi-aurora-one" />
-          <div className="rumi-aurora rumi-aurora-two" />
           <div className="relative z-10 mx-auto max-w-6xl text-center">
-            <SectionLabel>Pemantauan CCTV rumah</SectionLabel>
-            <h1 className="mx-auto mt-7 max-w-4xl text-[2.35rem] leading-[0.95] font-bold tracking-[-0.055em] sm:text-7xl lg:text-[5.7rem]">
-              <span className="block">Deteksi jatuh.</span>
-              <span className="block whitespace-nowrap text-[#0d7166]">Lewat CCTV rumah.</span>
+            <h1 className="mx-auto max-w-4xl text-[2.15rem] leading-[1.02] font-bold tracking-[-0.045em] sm:text-5xl lg:text-[4.25rem]">
+              <span className="block">Deteksi jatuh nyata</span>
+              <span className="block text-[#0d7166]">Lewat CCTV atau kamera HP</span>
             </h1>
-            <p className="mx-auto mt-7 max-w-xl text-base leading-7 text-[#55736d] sm:text-lg">
-              Pantau kamera dan lihat indikasi jatuh dari satu dashboard.
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[#335952] sm:text-lg">
+              Pantau lewat CCTV rumah atau kamera perangkat, dan terima notifikasi jatuh dari satu
+              dashboard.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button
                 asChild
                 size="lg"
-                className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-lg shadow-[#0d7166]/15 hover:bg-[#095e55]"
+                className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white shadow-md shadow-[#0d7166]/15 hover:bg-[#095e55]"
               >
                 <a href="#simulasi">
                   <Play className="size-4 fill-current" /> Lihat simulasi
@@ -219,422 +218,483 @@ function Landing() {
                 asChild
                 size="lg"
                 variant="outline"
-                className="rounded-full border-[#c9dfd9] bg-white/70 px-7 font-bold text-[#0a3934] hover:bg-white hover:text-[#0d7166]"
+                className="rounded-full border-[#c9dfd9] bg-white px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
               >
                 <Link to="/login">Coba Rumi</Link>
               </Button>
             </div>
 
-            <div className="rumi-device-stage relative mx-auto mt-20 h-[300px] max-w-5xl sm:h-[520px]">
+            <div className="rumi-device-stage relative mx-auto mt-10 h-[215px] max-w-4xl overflow-hidden sm:h-[340px] lg:h-[420px]">
               <img
                 src={landingCameraPhone}
                 alt="Tampilan halaman kamera Rumi di ponsel"
-                className="absolute left-[2%] top-[18%] z-30 w-[25%] -rotate-6 drop-shadow-2xl sm:left-0 sm:top-[14%] sm:w-[23%]"
+                width={720}
+                height={1440}
+                className="rumi-hero-phone-left absolute left-[2%] top-[16%] z-30 w-[23%] -rotate-6 drop-shadow-xl sm:left-[3%] sm:top-[12%] sm:w-[20%]"
               />
               <img
                 src={landingDashboardTablet}
                 alt="Tampilan dashboard Rumi di tablet"
-                className="absolute left-1/2 top-[10%] z-20 w-[88%] max-w-[780px] -translate-x-1/2 drop-shadow-2xl sm:top-[7%] sm:w-[78%]"
+                width={1400}
+                height={980}
+                fetchPriority="high"
+                className="rumi-hero-tablet absolute left-1/2 top-[4%] z-20 w-[82%] max-w-[640px] -translate-x-1/2 drop-shadow-xl sm:w-[72%]"
               />
               <img
                 src={landingSettingsPhone}
                 alt="Tampilan halaman pengaturan Rumi di ponsel"
-                className="absolute right-[2%] top-[18%] z-30 w-[25%] rotate-6 drop-shadow-2xl sm:right-0 sm:top-[14%] sm:w-[23%]"
+                width={720}
+                height={1440}
+                className="rumi-hero-phone-right absolute right-[2%] top-[16%] z-30 w-[23%] rotate-6 drop-shadow-xl sm:right-[3%] sm:top-[12%] sm:w-[20%]"
               />
             </div>
-            <p className="mt-6 text-[10px] font-semibold tracking-[0.18em] text-[#6c8983] uppercase">
-              Monitoring CCTV • Deteksi dan notifikasi dalam satu sistem
-            </p>
-          </div>
-        </section>
 
-        <section className="border-y border-[#dcebe7] bg-white px-4 py-16">
-          <div className="mx-auto grid max-w-6xl gap-10 text-center md:grid-cols-3 md:text-left">
-            {[
-              ["Satu dashboard", "Kamera tersebar, konteks tetap utuh"],
-              ["Tanpa sensor tubuh", "Manfaatkan kamera yang sudah tersedia"],
-              ["Bukti yang jelas", "Snapshot, waktu, dan lokasi kejadian"],
-            ].map(([title, text], index) => (
-              <div key={title} className="relative md:pl-8">
-                {index > 0 && (
-                  <span className="absolute -left-5 top-0 hidden h-full w-px bg-white/10 md:block" />
-                )}
-                <p className="font-display text-2xl font-bold text-[#0d7166]">{title}</p>
-                <p className="mt-2 text-sm text-[#6a8580]">{text}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section id="simulasi" className="relative scroll-mt-24 px-4 py-28 lg:py-36">
-          <div className="mx-auto max-w-6xl">
-            <div className="mx-auto max-w-3xl text-center">
-              <SectionLabel>Simulasi yang transparan</SectionLabel>
-              <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-6xl">
-                Kenali konteks, bukan sekadar alarm.
-              </h2>
-              <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-[#63807a]">
-                Saat indikasi muncul, pendamping membutuhkan tiga hal: apa yang terlihat, di ruangan
-                mana, dan kapan terjadi.
-              </p>
-            </div>
-
-            <div className="rumi-simulation-frame relative mx-auto mt-16 max-w-5xl overflow-hidden rounded-[2rem] border border-[#cfe3dd] bg-white p-2 sm:p-3">
-              <video
-                controls
-                playsInline
-                preload="metadata"
-                poster={landingFallDetection}
-                className="aspect-video w-full rounded-[1.4rem] bg-black object-cover"
-                aria-label="Video simulasi deteksi jatuh Rumi"
-              >
-                <source src={landingFallSimulation} type="video/mp4" />
-                Browser Anda tidak mendukung pemutar video.
-              </video>
-            </div>
-          </div>
-        </section>
-
-        <section id="fitur" className="scroll-mt-24 px-4 pb-28 lg:pb-36">
-          <div className="mx-auto max-w-6xl">
-            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <div className="max-w-2xl">
-                <SectionLabel>Yang Rumi satukan</SectionLabel>
-                <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-6xl">
-                  Empat kebutuhan. Satu pandangan.
-                </h2>
-              </div>
-              <p className="max-w-sm text-sm leading-6 text-[#63807a]">
-                Didesain untuk keluarga dan caregiver yang perlu memantau beberapa ruang tanpa terus
-                berpindah layar.
-              </p>
-            </div>
-            <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {BENEFITS.map((benefit, index) => (
-                <article
-                  key={benefit.title}
-                  className={`group relative min-h-64 overflow-hidden rounded-[1.75rem] border p-6 shadow-[0_20px_60px_-42px_#0d7166] ${index === 1 ? "border-[#ff665d]/25 bg-[#fff3f1]" : "border-[#d6e8e3] bg-white"}`}
-                >
-                  <span
-                    className={`flex size-11 items-center justify-center rounded-2xl ${index === 1 ? "bg-[#ff665d] text-white" : "bg-[#dff3ed] text-[#0d7166]"}`}
-                  >
-                    <benefit.icon className="size-5" />
-                  </span>
-                  <span className="absolute right-6 top-6 font-display text-xs font-bold text-[#0d7166]/20">
-                    0{index + 1}
-                  </span>
-                  <div className="absolute inset-x-6 bottom-6">
-                    <h3 className="text-xl font-bold">{benefit.title}</h3>
-                    <p className="mt-3 text-sm leading-6 text-[#63807a]">{benefit.description}</p>
-                  </div>
-                </article>
+            <div className="mx-auto mt-6 grid max-w-4xl gap-3 border-t border-[#d8e9e4] pt-6 text-left sm:grid-cols-3">
+              {[
+                ["Satu dashboard", "Kamera tersebar, konteks tetap utuh"],
+                ["Tanpa sensor tubuh", "Manfaatkan CCTV atau kamera HP"],
+                ["Bukti yang jelas", "Snapshot, waktu, dan lokasi kejadian"],
+              ].map(([title, text]) => (
+                <div key={title} className="rounded-2xl bg-white/80 px-4 py-3">
+                  <p className="font-display text-base font-bold text-[#0d7166]">{title}</p>
+                  <p className="mt-0.5 text-sm text-[#335952]">{text}</p>
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="overflow-hidden border-y border-[#dcebe7] bg-[#edf9f5] px-4 py-28 lg:py-36">
-          <div className="mx-auto grid max-w-6xl items-center gap-16 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="relative">
-              <div className="absolute -inset-16 bg-[radial-gradient(circle,#91f0d11a,transparent_65%)]" />
-              <div className="relative">
-                <img
-                  src={landingDashboardTablet}
-                  alt="Dashboard monitoring Rumi pada tablet"
-                  className="w-full drop-shadow-2xl"
-                  loading="lazy"
-                />
+        {/* 2. SIMULASI & KONTEKS ALERT */}
+        <section id="simulasi" className="scroll-mt-20 bg-white px-4 py-14 lg:py-20">
+          <div className="rumi-reveal mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:gap-12">
+            <div>
+              <div className="rumi-simulation-frame relative overflow-hidden rounded-3xl border border-[#cfe3dd] bg-[#f7fbf9] p-2">
+                <video
+                  ref={simVideoRef}
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  poster={landingFallDetection}
+                  width={1280}
+                  height={720}
+                  onTimeUpdate={(event) => {
+                    const video = event.currentTarget;
+                    if (video.currentTime >= 10) {
+                      video.currentTime = 0;
+                    }
+                  }}
+                  className="aspect-video w-full rounded-2xl bg-black object-cover"
+                  aria-label="Video simulasi deteksi jatuh Rumi"
+                >
+                  <source src={landingFallSimulation} type="video/mp4" />
+                  Browser Anda tidak mendukung pemutar video.
+                </video>
+                <button
+                  type="button"
+                  onClick={handleToggleVideo}
+                  className="absolute bottom-4 right-4 inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[#0a3934]/85 px-3.5 py-1.5 text-xs font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-[#0d7166] active:scale-[0.97] motion-reduce:active:scale-100"
+                >
+                  {videoPlaying ? (
+                    <>
+                      <Pause className="size-3.5" aria-hidden="true" /> Jeda
+                    </>
+                  ) : (
+                    <>
+                      <Play className="size-3.5" aria-hidden="true" /> Putar
+                    </>
+                  )}
+                </button>
               </div>
             </div>
+
             <div>
-              <SectionLabel>Monitoring first</SectionLabel>
-              <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-5xl">
-                Semua ruang terlihat dalam satu dashboard.
+              <h2 className="text-3xl leading-tight font-bold sm:text-4xl">
+                Kenali konteks, bukan sekadar alarm
               </h2>
-              <p className="mt-5 text-sm leading-6 text-[#63807a]">
-                Grid multi-kamera mempertahankan rasio video, menampilkan lokasi, dan membedakan
-                feed live, offline, atau belum dapat diputar browser.
+              <p className="mt-3 text-base leading-6 text-[#335952]">
+                Saat indikasi jatuh muncul, Rumi menyatukan pose tubuh, nama ruangan, dan waktu
+                kejadian agar pendamping langsung tahu apa yang perlu diperiksa.
               </p>
-              <div className="mt-8 grid grid-cols-2 gap-3">
-                {[
-                  [Video, "Pantau feed"],
-                  [MapPin, "Kenali lokasi"],
-                  [Radio, "Lihat status"],
-                  [Expand, "Buka fullscreen"],
-                ].map(([Icon, label]) => {
-                  const ItemIcon = Icon as typeof Video;
-                  return (
-                    <div
-                      key={String(label)}
-                      className="flex items-center gap-3 rounded-2xl border border-[#d3e6e0] bg-white p-4 text-sm font-bold shadow-sm"
-                    >
-                      <ItemIcon className="size-4 text-[#0d7166]" />
-                      {String(label)}
-                    </div>
-                  );
-                })}
+
+              <div className="mt-5 rounded-2xl border border-[#f5c2be] bg-[#fff3f2] p-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#d43d37] text-white">
+                    <Siren className="size-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-[#b91c1c]">Indikasi jatuh terdeteksi</p>
+                    <p className="text-xs font-medium text-[#7f1d1d]">
+                      Ruang keluarga, Kamera 03, 10:24 WIB
+                    </p>
+                  </div>
+                </div>
               </div>
+
+              <ul className="mt-5 space-y-2 text-sm text-[#335952]">
+                {[
+                  "Deteksi pose tubuh di backend CCTV atau lokal via YOLO11-Pose ONNX",
+                  "Lokasi ruangan dan waktu selalu menempel pada setiap alert",
+                  "Snapshot dan klip sekitar insiden langsung tersimpan ke riwayat",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-[#0d7166]" aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
 
-        <section className="px-4 py-28 lg:py-40">
-          <div className="mx-auto max-w-6xl space-y-28">
-            <div className="grid items-center gap-14 lg:grid-cols-2">
-              <div className="order-2 lg:order-1">
-                <SectionLabel>Dari kamera ke notifikasi</SectionLabel>
-                <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-5xl">
-                  Lokasi dan waktu tetap menempel pada kejadian.
+        {/* 3. FITUR & ALUR (TABBED SHOWCASE) */}
+        <section
+          id="fitur"
+          className="scroll-mt-20 border-y border-[#dcebe7] bg-[#edf9f5] px-4 py-14 lg:py-20"
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <h2 className="text-3xl leading-tight font-bold sm:text-4xl">
+                  Satu alur pantau dari kamera ke bukti
                 </h2>
-                <p className="mt-5 max-w-lg text-sm leading-6 text-[#63807a]">
-                  Notifikasi tidak berdiri sendiri. Rumi menempatkan snapshot, kamera, dan waktu
-                  dalam satu kartu agar konteks mudah dibaca.
+                <p className="mt-2 max-w-xl text-base text-[#335952]">
+                  Didesain untuk keluarga dan caregiver agar memantau ruang, mengatur peringatan,
+                  dan memeriksa riwayat tanpa berpindah aplikasi.
                 </p>
-                <div className="mt-8 max-w-md rounded-2xl border border-[#ff665d]/25 bg-[#ff665d]/[0.07] p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 items-center justify-center rounded-xl bg-[#ff665d] text-white">
-                      <Siren className="size-5" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-[#ff847d]">Simulasi indikasi jatuh</p>
-                      <p className="mt-1 text-xs text-[#7b6a68]">Ruang keluarga · 10.24</p>
-                    </div>
-                  </div>
-                </div>
               </div>
-              <div className="order-1 overflow-hidden rounded-[2rem] border border-[#d3e6e0] bg-[#e8f7f2] p-3 lg:order-2">
-                <img
-                  src={landingFallDetection}
-                  alt="Deteksi jatuh dengan pose estimation dari kamera CCTV"
-                  className="aspect-[4/3] w-full rounded-[1.4rem] object-cover"
-                />
+
+              <div
+                role="tablist"
+                aria-label="Pilih tampilan fitur Rumi"
+                className="inline-flex w-fit rounded-full border border-[#cfe3dd] bg-white p-1"
+              >
+                {(
+                  [
+                    ["pantau", "Pantau Ruang"],
+                    ["notifikasi", "Notifikasi"],
+                    ["riwayat", "Riwayat"],
+                  ] as const
+                ).map(([key, label]) => {
+                  const selected = activeTab === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setActiveTab(key)}
+                      className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition-[color,background-color,transform] duration-200 active:scale-[0.97] motion-reduce:active:scale-100 ${
+                        selected ? "bg-[#0d7166] text-white" : "text-[#335952] hover:text-[#0a3934]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="grid items-center gap-14 lg:grid-cols-2">
-              <div className="rounded-[2rem] border border-[#d3e6e0] bg-[#e8f7f2] p-3">
-                <div className="overflow-hidden rounded-[1.4rem] bg-[#f3faf7] text-[#0a3934]">
-                  <BrowserBar path="riwayat" />
-                  <div className="p-5 sm:p-7">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-lg font-extrabold">Riwayat kejadian</p>
-                        <p className="text-[9px] text-[#66807b]">
-                          Snapshot berdasarkan waktu dan lokasi
-                        </p>
-                      </div>
-                      <ListFilter className="size-5 text-[#0d7166]" />
+            <div className="rumi-reveal mt-8 rounded-3xl border border-[#d3e6e0] bg-white p-5 sm:p-8 lg:flex lg:h-[440px] lg:items-center">
+              <div key={activeTab} className="rumi-tab-enter w-full">
+                {activeTab === "pantau" && (
+                  <div className="grid w-full items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+                    <div className="flex h-[240px] items-center justify-center rounded-2xl bg-[#f4faf7] p-4 sm:h-[340px] sm:p-6 lg:h-[368px]">
+                      <img
+                        src={landingDashboardTablet}
+                        alt="Dashboard monitoring multi-kamera Rumi pada tablet"
+                        width={1400}
+                        height={980}
+                        loading="lazy"
+                        className="max-h-full w-auto max-w-full rounded-xl object-contain"
+                      />
                     </div>
-                    <div className="mt-5 space-y-2">
+                    <div>
+                      <h3 className="text-2xl font-bold">Semua ruang terlihat dalam satu grid</h3>
+                      <p className="mt-3 text-sm leading-6 text-[#335952]">
+                        Grid multi-kamera mempertahankan rasio video, menampilkan nama ruangan,
+                        serta membedakan status live, offline, atau kamera perangkat lokal.
+                      </p>
+                      <div className="mt-5 grid grid-cols-2 gap-2.5">
+                        {[
+                          [Video, "Pantau feed live"],
+                          [MapPin, "Label lokasi ruang"],
+                          [Radio, "Status koneksi"],
+                          [Expand, "Mode fullscreen"],
+                        ].map(([Icon, label]) => {
+                          const ItemIcon = Icon as typeof Video;
+                          return (
+                            <div
+                              key={String(label)}
+                              className="flex items-center gap-2.5 rounded-xl border border-[#dcebe7] bg-[#f7fbf9] px-3.5 py-3 text-sm font-semibold text-[#0a3934]"
+                            >
+                              <ItemIcon
+                                className="size-4 shrink-0 text-[#0d7166]"
+                                aria-hidden="true"
+                              />
+                              <span>{String(label)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "notifikasi" && (
+                  <div className="grid w-full items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+                    <div className="flex h-[240px] items-center justify-center gap-4 rounded-2xl bg-[#f4faf7] p-4 sm:h-[340px] sm:p-6 lg:h-[368px]">
+                      <img
+                        src={landingCameraPhone}
+                        alt="Halaman kamera Rumi di ponsel"
+                        width={720}
+                        height={1440}
+                        loading="lazy"
+                        className="max-h-full w-auto object-contain"
+                      />
+                      <img
+                        src={landingSettingsPhone}
+                        alt="Halaman pengaturan notifikasi dan profil lansia Rumi di ponsel"
+                        width={720}
+                        height={1440}
+                        loading="lazy"
+                        className="max-h-full w-auto object-contain"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">
+                        Profil lansia dan alarm sesuai kebutuhan
+                      </h3>
+                      <p className="mt-3 text-sm leading-6 text-[#335952]">
+                        Atur nama lansia yang dipantau dan pilih kanal peringatan yang aktif di
+                        perangkat pendamping, termasuk dukungan PWA untuk notifikasi latar belakang.
+                      </p>
+                      <div className="mt-5 space-y-2.5">
+                        {[
+                          ["Pop-up Fall Alert", "Banner peringatan segera muncul di dashboard"],
+                          ["Alarm Suara", "Bunyikan peringatan audio saat indikasi jatuh diterima"],
+                          [
+                            "Notifikasi Browser & PWA",
+                            "Tetap menerima notifikasi saat tab tidak aktif",
+                          ],
+                        ].map(([title, desc]) => (
+                          <div
+                            key={title}
+                            className="flex items-start gap-3 rounded-xl border border-[#dcebe7] bg-[#f7fbf9] px-4 py-3"
+                          >
+                            <BellRing
+                              className="mt-0.5 size-4 shrink-0 text-[#0d7166]"
+                              aria-hidden="true"
+                            />
+                            <div>
+                              <p className="text-sm font-bold text-[#0a3934]">{title}</p>
+                              <p className="text-xs text-[#335952]">{desc}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "riwayat" && (
+                  <div className="grid w-full items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+                    <div className="flex h-[240px] flex-col justify-center gap-2.5 rounded-2xl bg-[#f4faf7] p-4 sm:h-[340px] sm:p-6 lg:h-[368px]">
                       {[
-                        [fallSnapshot, "Indikasi jatuh", "Ruang keluarga", "10.24", true],
-                        [feedKitchen, "Gerakan terdeteksi", "Ruang makan", "09.17", false],
-                        [feedBedroom, "Gerakan terdeteksi", "Kamar utama", "08.53", false],
+                        [
+                          fallSnapshot,
+                          "Indikasi jatuh",
+                          "Ruang keluarga, Kamera 03",
+                          "10:24 WIB",
+                          true,
+                        ],
+                        [feedKitchen, "Gerakan terdeteksi", "Dapur, Kamera 02", "09:17 WIB", false],
+                        [
+                          feedBedroom,
+                          "Gerakan terdeteksi",
+                          "Kamar utama, Kamera 01",
+                          "08:53 WIB",
+                          false,
+                        ],
                       ].map(([image, title, location, time, alert]) => (
                         <div
                           key={String(time)}
-                          className={`grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 rounded-xl p-2.5 ${alert ? "bg-[#ffe3e0]" : "bg-white"}`}
+                          className={`grid grid-cols-[5.5rem_1fr_auto] items-center gap-3 rounded-xl p-2.5 ${
+                            alert ? "border border-[#f5c2be] bg-[#fff3f2]" : "bg-white"
+                          }`}
                         >
                           <img
                             src={String(image)}
                             alt=""
-                            className="h-11 w-full rounded-lg object-cover"
+                            width={320}
+                            height={180}
+                            loading="lazy"
+                            className="h-14 w-full rounded-lg object-cover"
                           />
                           <div>
                             <p
-                              className={`text-[10px] font-extrabold ${alert ? "text-[#d43d37]" : ""}`}
+                              className={`text-sm font-bold ${
+                                alert ? "text-[#b91c1c]" : "text-[#0a3934]"
+                              }`}
                             >
                               {String(title)}
                             </p>
-                            <p className="mt-1 text-[8px] text-[#66807b]">{String(location)}</p>
+                            <p className="text-xs text-[#335952]">{String(location)}</p>
                           </div>
-                          <span className="text-[9px] font-bold text-[#66807b]">
+                          <span className="text-xs font-semibold text-[#335952]">
                             {String(time)}
                           </span>
                         </div>
                       ))}
                     </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">
+                        Tinjau bukti tanpa status membingungkan
+                      </h3>
+                      <p className="mt-3 text-sm leading-6 text-[#335952]">
+                        Riwayat berfokus pada bukti yang benar-benar terekam: snapshot, waktu,
+                        lokasi ruangan, dan klip singkat sekitar kejadian agar mudah diverifikasi
+                        ulang.
+                      </p>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="mt-5 rounded-full border-[#c9dfd9] bg-white px-5 font-semibold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
+                      >
+                        <Link to="/riwayat">
+                          Buka riwayat <ChevronRight className="size-4" />
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div>
-                <SectionLabel>Bukti, bukan workflow</SectionLabel>
-                <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-5xl">
-                  Tinjau kembali tanpa status yang membingungkan.
-                </h2>
-                <p className="mt-5 max-w-lg text-sm leading-6 text-[#63807a]">
-                  Riwayat berfokus pada apa yang terekam: snapshot, waktu, lokasi, dan durasi
-                  klip—tanpa klaim bahwa insiden telah ditangani.
-                </p>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="mt-8 rounded-full border-[#c9dfd9] bg-white px-6 text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
-                >
-                  <Link to="/riwayat">
-                    Buka riwayat <ChevronRight className="size-4" />
-                  </Link>
-                </Button>
+                )}
               </div>
             </div>
-          </div>
-        </section>
 
-        <section
-          id="cara-kerja"
-          className="scroll-mt-24 border-y border-[#dcebe7] bg-white px-4 py-28 lg:py-36"
-        >
-          <div className="mx-auto max-w-6xl">
-            <div className="mx-auto max-w-3xl text-center">
-              <SectionLabel>Alur sederhana</SectionLabel>
-              <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-6xl">
-                Dari kamera rumah ke bukti kejadian.
-              </h2>
-            </div>
-            <ol className="relative mt-16 grid gap-4 md:grid-cols-4">
-              <div className="rumi-step-line absolute left-[12%] right-[12%] top-7 hidden h-px md:block" />
-              {STEPS.map((step, index) => (
+            <ol className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {WORKFLOW_STEPS.map((step, index) => (
                 <li
                   key={step.title}
-                  className="relative rounded-[1.75rem] border border-[#d6e8e3] bg-[#f8fcfa] p-6 shadow-[0_20px_60px_-45px_#0d7166]"
+                  style={{ "--reveal-delay": `${index * 50}ms` } as CSSProperties}
+                  className="rumi-reveal flex items-start gap-3 rounded-2xl border border-[#d6e8e3] bg-white px-4 py-3.5"
                 >
-                  <span className="relative z-10 flex size-14 items-center justify-center rounded-full border border-[#0d7166]/15 bg-[#dff3ed] text-[#0d7166]">
-                    <step.icon className="size-5" />
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#dff3ed] text-[#0d7166]">
+                    <step.icon className="size-4" aria-hidden="true" />
                   </span>
-                  <p className="mt-12 text-[10px] font-bold tracking-[0.16em] text-[#0d7166]/40 uppercase">
-                    Langkah {index + 1}
-                  </p>
-                  <h3 className="mt-2 text-xl font-bold">{step.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-[#63807a]">{step.text}</p>
+                  <div>
+                    <p className="text-sm font-bold text-[#0a3934]">{step.title}</p>
+                    <p className="mt-0.5 text-xs text-[#335952]">{step.detail}</p>
+                  </div>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        <section className="px-4 py-28 lg:py-36">
-          <div className="rumi-honesty relative mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#cfe3dd] bg-[#eaf7f3] p-7 sm:p-12 lg:p-16">
-            <div className="relative z-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-              <div>
-                <SectionLabel>Dibangun dengan jujur</SectionLabel>
-                <h2 className="mt-6 max-w-3xl text-4xl leading-tight font-bold sm:text-6xl">
-                  Rumi membantu melihat. Manusia tetap memutuskan.
-                </h2>
-                <p className="mt-5 max-w-2xl text-sm leading-6 text-[#63807a]">
-                  Rumi bukan perangkat medis, diagnosis klinis, atau layanan darurat. Sistem ini
-                  membantu menyatukan monitoring dan notifikasi agar informasi lebih mudah dipahami.
-                </p>
-              </div>
-              <div className="space-y-3">
-                {[
-                  "Deteksi masih berupa simulasi frontend",
-                  "RTSP memerlukan media gateway",
-                  "Data kamera lokal tersimpan di browser",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-[#d2e5df] bg-white/75 p-4 text-sm text-[#456b64]"
-                  >
-                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#0d7166]" />
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="faq" className="scroll-mt-24 px-4 pb-28 lg:pb-36">
-          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.8fr_1.2fr]">
-            <div>
-              <SectionLabel>Pertanyaan penting</SectionLabel>
-              <h2 className="mt-6 text-4xl leading-tight font-bold sm:text-5xl">
-                Kenali Rumi sebelum mencoba.
+        {/* 4. FAQ & CATATAN TRANSPARANSI */}
+        <section id="faq" className="scroll-mt-20 px-4 py-14 lg:py-20">
+          <div className="rumi-reveal mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+            <div className="rounded-3xl border border-[#cfe3dd] bg-[#eaf7f3] p-6 sm:p-7">
+              <h2 className="text-2xl leading-tight font-bold sm:text-3xl">
+                Rumi membantu melihat, manusia tetap memutuskan
               </h2>
-              <p className="mt-5 max-w-sm text-sm leading-6 text-[#63807a]">
-                Semua jawaban diselaraskan dengan kemampuan aktual proyek, bukan janji pemasaran.
+              <p className="mt-3 text-sm leading-6 text-[#335952]">
+                Rumi bukan perangkat medis, diagnosis klinis, atau layanan darurat. Sistem ini
+                membantu menyatukan pemantauan dan notifikasi agar kondisi lebih cepat dikenali.
               </p>
+              <ul className="mt-5 space-y-2.5">
+                {[
+                  "CCTV diproses di backend; kamera perangkat berjalan lokal via YOLO11-Pose ONNX",
+                  "Stream RTSP memerlukan media gateway agar dapat diputar di browser",
+                  "Pencahayaan, sudut kamera, dan koneksi jaringan memengaruhi deteksi",
+                ].map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-2.5 rounded-xl bg-white/85 px-3.5 py-2.5 text-xs leading-5 font-medium text-[#24524b]"
+                  >
+                    <ShieldCheck
+                      className="mt-0.5 size-4 shrink-0 text-[#0d7166]"
+                      aria-hidden="true"
+                    />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <Accordion type="single" collapsible className="space-y-3">
-              {FAQS.map((faq, index) => (
-                <AccordionItem
-                  key={faq.q}
-                  value={`item-${index}`}
-                  className="rounded-2xl border border-[#d6e8e3] bg-white px-5 shadow-sm"
-                >
-                  <AccordionTrigger className="text-left text-base font-bold text-[#0a3934] hover:no-underline">
-                    {faq.q}
-                  </AccordionTrigger>
-                  <AccordionContent className="pr-8 text-sm leading-6 text-[#63807a]">
-                    {faq.a}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+
+            <div>
+              <h2 className="text-2xl leading-tight font-bold sm:text-3xl">
+                Pertanyaan sebelum mencoba
+              </h2>
+              <Accordion type="single" collapsible className="mt-5 space-y-2.5">
+                {FAQS.map((faq, index) => (
+                  <AccordionItem
+                    key={faq.q}
+                    value={`item-${index}`}
+                    className="rounded-2xl border border-[#d6e8e3] bg-white px-5"
+                  >
+                    <AccordionTrigger className="py-4 text-left text-sm font-bold text-[#0a3934] hover:no-underline sm:text-base">
+                      {faq.q}
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-4 text-sm leading-6 text-[#335952]">
+                      {faq.a}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
           </div>
         </section>
 
-        <section className="px-4 pb-16">
-          <div className="rumi-final-cta relative mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#cfe3dd] px-6 py-20 text-center sm:px-12 sm:py-24">
-            <div className="relative z-10">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-[#0d7166]/15 bg-white text-[#0d7166] shadow-sm">
-                <House className="size-6" />
-              </span>
-              <h2 className="mx-auto mt-7 max-w-3xl text-4xl leading-tight font-bold sm:text-6xl">
-                Lihat rumah dari sudut yang lebih tenang.
+        {/* 5. COMPACT FINAL CTA */}
+        <section className="px-4 pb-12">
+          <div className="rumi-reveal rumi-final-cta mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 rounded-3xl border border-[#cfe3dd] px-6 py-10 text-center sm:px-10 sm:py-12 lg:flex-row lg:text-left">
+            <div className="max-w-xl">
+              <h2 className="text-2xl leading-tight font-bold sm:text-4xl">
+                Lihat rumah dari sudut yang lebih tenang
               </h2>
-              <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-[#63807a]">
+              <p className="mt-2.5 text-sm leading-6 text-[#335952] sm:text-base">
                 Masuk ke Rumi, tambahkan kamera Anda, dan kelola alur monitoring dari satu
                 dashboard.
               </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <Button
-                  asChild
-                  size="lg"
-                  className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white hover:bg-[#095e55]"
-                >
-                  <Link to="/login">
-                    Masuk ke Rumi <ChevronRight className="size-4" />
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="rounded-full border-[#bfd8d1] bg-white/65 px-7 font-bold text-[#0a3934] hover:bg-white hover:text-[#0d7166]"
-                >
-                  <Link to="/register">Buat akun</Link>
-                </Button>
-              </div>
-              <div className="mt-7 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-[#63807a]">
-                {["Tanpa sensor tubuh", "Dukungan multi-kamera", "Fullscreen kamera"].map(
-                  (item) => (
-                    <span key={item} className="flex items-center gap-1.5">
-                      <Check className="size-3.5 text-[#0d7166]" />
-                      {item}
-                    </span>
-                  ),
-                )}
-              </div>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button
+                asChild
+                size="lg"
+                className="rounded-full bg-[#0d7166] px-7 font-extrabold text-white hover:bg-[#095e55]"
+              >
+                <Link to="/login">
+                  Masuk ke Rumi <ChevronRight className="size-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="rounded-full border-[#bfd8d1] bg-white px-7 font-bold text-[#0a3934] hover:bg-[#e8f7f2] hover:text-[#0d7166]"
+              >
+                <Link to="/register">Buat akun</Link>
+              </Button>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-[#dcebe7] bg-white px-4 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 text-center sm:flex-row sm:text-left">
-          <div>
-            <BrandLogo imageClassName="size-9" textClassName="text-[#0d7166]" />
-            <p className="mt-3 max-w-sm text-xs leading-5 text-[#78918c]">
-              Sistem monitoring CCTV dan notifikasi indikasi jatuh.
-            </p>
+      <footer className="border-t border-[#dcebe7] bg-white px-4 py-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-center sm:grid sm:grid-cols-[1fr_auto_1fr] sm:text-left">
+          <div className="flex items-center gap-3 sm:justify-self-start">
+            <BrandLogo imageClassName="size-8" textClassName="text-[#0d7166]" />
+            <span className="hidden text-xs text-[#41635c] lg:inline">
+              Monitoring CCTV dan notifikasi indikasi jatuh
+            </span>
           </div>
-          <div className="flex flex-wrap justify-center gap-6 text-xs font-semibold text-[#63807a]">
+          <div className="flex flex-wrap justify-center gap-6 text-xs font-semibold text-[#335952] sm:justify-self-center">
+            <a href="#simulasi" className="hover:text-[#0d7166]">
+              Simulasi
+            </a>
             <a href="#fitur" className="hover:text-[#0d7166]">
               Fitur
-            </a>
-            <a href="#cara-kerja" className="hover:text-[#0d7166]">
-              Cara kerja
             </a>
             <a href="#faq" className="hover:text-[#0d7166]">
               FAQ
@@ -643,7 +703,7 @@ function Landing() {
               Login
             </Link>
           </div>
-          <p className="text-xs text-[#78918c]">© 2026 Rumi</p>
+          <p className="text-xs text-[#41635c] sm:justify-self-end">© 2026 Rumi</p>
         </div>
       </footer>
     </div>
