@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { cameraApi, getUser, type Camera } from "@/lib/api";
+import { cameraApi, getUser, type CameraProtocol } from "@/lib/api";
 
-export type CameraProtocol = "HTTP" | "RTSP";
+export type { CameraProtocol };
+
+export type DeviceFacingMode = "environment" | "user";
 
 export type SavedCamera = {
   id: string;
@@ -19,8 +21,21 @@ function getStorageKey(): string {
   return user?.id ? `rumi-cameras_${user.id}` : "rumi-cameras_guest";
 }
 
+export function isDeviceCameraUrl(url: string): boolean {
+  return /^device:\/\//i.test(url.trim());
+}
+
+export function getDeviceFacingMode(url: string): DeviceFacingMode {
+  return url.trim().toLowerCase() === "device://user" ? "user" : "environment";
+}
+
 export function normalizeCameraUrl(url: string) {
   const trimmedUrl = url.trim();
+  if (isDeviceCameraUrl(trimmedUrl)) {
+    return trimmedUrl.toLowerCase() === "device://user"
+      ? "device://user"
+      : "device://environment";
+  }
   if (!/^https?:\/\//i.test(trimmedUrl)) return trimmedUrl;
 
   try {
@@ -33,6 +48,7 @@ export function normalizeCameraUrl(url: string) {
 }
 
 export function getCameraProtocol(url: string): CameraProtocol {
+  if (isDeviceCameraUrl(url)) return "DEVICE";
   if (/^rtsp:\/\//i.test(url)) return "RTSP";
   return "HTTP";
 }
@@ -60,6 +76,7 @@ function writeCachedCameras(cameras: SavedCamera[]) {
 }
 
 export async function fetchCameras(): Promise<SavedCamera[]> {
+  const localDeviceCameras = readCachedCameras().filter((c) => c.protocol === "DEVICE");
   try {
     const remoteCameras = await cameraApi.list();
     const formatted: SavedCamera[] = remoteCameras.map((c) => ({
@@ -70,8 +87,9 @@ export async function fetchCameras(): Promise<SavedCamera[]> {
       protocol: c.protocol,
       status: c.status,
     }));
-    writeCachedCameras(formatted);
-    return formatted;
+    const merged = [...formatted, ...localDeviceCameras];
+    writeCachedCameras(merged);
+    return merged;
   } catch (err) {
     console.warn("Using cached cameras due to fetch error:", err);
     return readCachedCameras();
@@ -80,6 +98,21 @@ export async function fetchCameras(): Promise<SavedCamera[]> {
 
 export async function addCamera(camera: { name: string; location: string; url: string }) {
   const normalizedUrl = normalizeCameraUrl(camera.url);
+  const protocol = getCameraProtocol(normalizedUrl);
+
+  if (protocol === "DEVICE") {
+    const deviceCamera: SavedCamera = {
+      id: `device-${crypto.randomUUID()}`,
+      name: camera.name,
+      location: camera.location,
+      url: normalizedUrl,
+      protocol: "DEVICE",
+      status: "online",
+    };
+    writeCachedCameras([...readCachedCameras(), deviceCamera]);
+    return deviceCamera;
+  }
+
   try {
     const created = await cameraApi.create({
       name: camera.name,
@@ -102,7 +135,6 @@ export async function addCamera(camera: { name: string; location: string; url: s
     return created;
   } catch (err) {
     // Fallback locally
-    const protocol = getCameraProtocol(normalizedUrl);
     const localCamera: SavedCamera = {
       id: crypto.randomUUID(),
       name: camera.name,
@@ -117,12 +149,17 @@ export async function addCamera(camera: { name: string; location: string; url: s
 }
 
 export async function removeCamera(id: string) {
-  try {
-    await cameraApi.delete(id);
-  } catch (err) {
-    console.warn("Could not delete camera on backend, removing locally:", err);
-  }
   const current = readCachedCameras();
+  const target = current.find((c) => c.id === id);
+  const isLocalDevice = id.startsWith("device-") || target?.protocol === "DEVICE";
+
+  if (!isLocalDevice) {
+    try {
+      await cameraApi.delete(id);
+    } catch (err) {
+      console.warn("Could not delete camera on backend, removing locally:", err);
+    }
+  }
   writeCachedCameras(current.filter((c) => c.id !== id));
 }
 

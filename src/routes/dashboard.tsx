@@ -111,9 +111,13 @@ function Dashboard() {
     };
   }, []);
 
-  const totalCameras = stats?.total_cameras ?? savedCameras.length;
+  const localDeviceCamerasCount = savedCameras.filter((c) => c.protocol === "DEVICE").length;
+  const totalCameras =
+    stats !== null ? stats.total_cameras + localDeviceCamerasCount : savedCameras.length;
   const activeCamerasCount =
-    stats?.active_cameras ?? savedCameras.filter((c) => c.status !== "offline").length;
+    stats !== null
+      ? stats.active_cameras + localDeviceCamerasCount
+      : savedCameras.filter((c) => c.status !== "offline").length;
   const unavailableCameraCount = Math.max(0, totalCameras - activeCamerasCount);
   const uptime = stats?.uptime_percentage ?? 99.6;
   const latency = stats?.latency_seconds ?? 2.4;
@@ -194,10 +198,11 @@ function Dashboard() {
                     <CameraStream
                       cameraId={camera.id}
                       name={camera.name}
+                      location={camera.location}
                       url={camera.url}
                       protocol={camera.protocol}
                     />
-                    {!isOffline && camera.protocol === "HTTP" && (
+                    {!isOffline && (camera.protocol === "HTTP" || camera.protocol === "DEVICE") && (
                       <div className="camera-live-only absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground">
                         <span className="size-2 rounded-full bg-destructive" />
                         Live

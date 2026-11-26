@@ -1,12 +1,18 @@
 import { Cctv, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { OnDeviceCamera } from "@/components/on-device-camera";
 import { API_BASE_URL } from "@/lib/api";
-import { normalizeCameraUrl, type CameraProtocol } from "@/lib/cameras";
+import {
+  getDeviceFacingMode,
+  normalizeCameraUrl,
+  type CameraProtocol,
+} from "@/lib/cameras";
 
 type CameraStreamProps = {
   cameraId?: string;
   name: string;
+  location?: string;
   url: string;
   protocol: CameraProtocol;
   className?: string;
@@ -15,6 +21,7 @@ type CameraStreamProps = {
 export function CameraStream({
   cameraId,
   name,
+  location,
   url,
   protocol,
   className,
@@ -22,21 +29,24 @@ export function CameraStream({
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Jika protokol RTSP, alirkan melalui proxy gateway backend (/api/cameras/{id}/stream)
-  // agar browser dapat memutar frame video langsung via tag <img> tanpa perlu plugin tambahan
-  const basePlaybackUrl =
-    protocol === "RTSP" && cameraId
-      ? `${API_BASE_URL}/api/cameras/${cameraId}/stream`
-      : normalizeCameraUrl(url);
+  const isDeviceCamera = protocol === "DEVICE";
+
+  // Alirkan seluruh kamera terdaftar via backend proxy agar diproses oleh model YOLO11
+  // (menampilkan bounding box & pose skeleton)
+  const isBackendStream = Boolean(cameraId) && !isDeviceCamera;
+  const basePlaybackUrl = isBackendStream
+    ? `${API_BASE_URL}/api/cameras/${cameraId}/stream`
+    : normalizeCameraUrl(url);
 
   const playbackUrl =
-    protocol === "RTSP" && reloadKey > 0
+    isBackendStream && reloadKey > 0
       ? `${basePlaybackUrl}?t=${reloadKey}`
       : basePlaybackUrl;
 
   // Tangani perpindahan tab browser: saat tab aktif kembali, segarkan koneksi stream
   // agar frame tidak freeze akibat browser men-throttle background tab
   useEffect(() => {
+    if (isDeviceCamera) return;
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setReloadKey((prev) => prev + 1);
@@ -46,13 +56,25 @@ export function CameraStream({
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
+  }, [isDeviceCamera]);
 
   useEffect(() => {
-    if (!failed) return;
+    if (isDeviceCamera || !failed) return;
     const retryTimer = window.setTimeout(() => setFailed(false), 4000);
     return () => window.clearTimeout(retryTimer);
-  }, [failed, playbackUrl]);
+  }, [isDeviceCamera, failed, playbackUrl]);
+
+  if (isDeviceCamera) {
+    return (
+      <OnDeviceCamera
+        cameraId={cameraId}
+        cameraName={name}
+        cameraLocation={location}
+        initialFacingMode={getDeviceFacingMode(url)}
+        className={className}
+      />
+    );
+  }
 
   if (failed) {
     return (
