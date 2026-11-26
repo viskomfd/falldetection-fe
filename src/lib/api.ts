@@ -145,6 +145,13 @@ export function resolveMediaUrl(path?: string | null): string {
   return `${API_BASE_URL}${cleanPath}`;
 }
 
+export function getDeviceStreamWsUrl(cameraId: string): string {
+  const base = WS_BASE_URL.replace(/\/ws\/alerts\/?$/i, "");
+  const token = getToken();
+  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${base}/ws/device-stream/${cameraId}${qs}`;
+}
+
 // ========================
 // CORE FETCH CLIENT
 // ========================
@@ -371,6 +378,23 @@ export const incidentApi = {
   async clearAll(): Promise<{ message: string; deleted_count: number }> {
     return apiRequest<{ message: string; deleted_count: number }>("/api/incidents", {
       method: "DELETE",
+    });
+  },
+
+  async reportOnDeviceAlert(formData: FormData): Promise<Incident> {
+    return apiRequest<Incident>("/api/incidents/on-device-alert", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  async uploadIncidentClip(
+    incidentId: string,
+    formData: FormData,
+  ): Promise<{ status: string; incident_id: string; clip_url: string; clip_duration: string }> {
+    return apiRequest(`/api/incidents/${incidentId}/clip`, {
+      method: "POST",
+      body: formData,
     });
   },
 

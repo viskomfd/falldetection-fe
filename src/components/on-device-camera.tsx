@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { playFallAlarm } from "@/lib/alarm";
-import { incidentApi } from "@/lib/api";
+import { getDeviceStreamWsUrl, getUser, incidentApi } from "@/lib/api";
 import type { DeviceFacingMode } from "@/lib/cameras";
 import {
   drawPoseOverlay,
@@ -45,6 +45,12 @@ const CLIP_FRAME_INTERVAL_MS = 66;
 const SUSPECTED_CLIP_MAX_DURATION_MS = 15_000;
 const POST_FALL_RECORD_MS = 3500;
 const FALLBACK_CLIP_DURATION_MS = 4500;
+
+const RELAY_FRAME_INTERVAL_MS = 67;
+const RELAY_MAX_WIDTH = 360;
+const RELAY_JPEG_QUALITY = 0.6;
+const RELAY_MAX_BUFFERED_BYTES = 128_000;
+const RELAY_PING_INTERVAL_MS = 20_000;
 
 function pickSupportedClipMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -134,6 +140,10 @@ export function OnDeviceCamera({
   const videoUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeClipRef = useRef<ActiveClipRecording | null>(null);
+  const relayWsRef = useRef<WebSocket | null>(null);
+  const relayTimerRef = useRef<number | null>(null);
+  const relayPingTimerRef = useRef<number | null>(null);
+  const sendingFrameRef = useRef(false);
 
   const [mode, setMode] = useState<SourceMode>("idle");
   const [facingMode, setFacingMode] = useState<DeviceFacingMode>(initialFacingMode);
@@ -276,10 +286,133 @@ export function OnDeviceCamera({
     });
   }
 
+  function clearRelayTimers() {
+    if (relayTimerRef.current !== null) {
+      window.clearInterval(relayTimerRef.current);
+      relayTimerRef.current = null;
+    }
+    if (relayPingTimerRef.current !== null) {
+      window.clearInterval(relayPingTimerRef.current);
+      relayPingTimerRef.current = null;
+    }
+    sendingFrameRef.current = false;
+  }
+
+  function stopRelayPublisher() {
+    clearRelayTimers();
+    const ws = relayWsRef.current;
+    if (ws) {
+      relayWsRef.current = null;
+      try {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      } catch {
+        // ignore close errors
+      }
+    }
+  }
+
+  function startRelayPublisher(myRunId: number) {
+    stopRelayPublisher();
+    if (!cameraId || cameraId.startsWith("device-")) return;
+
+    try {
+      const ws = new WebSocket(getDeviceStreamWsUrl(cameraId));
+      relayWsRef.current = ws;
+
+      const relayCanvas = document.createElement("canvas");
+      const relayCtx = relayCanvas.getContext("2d");
+
+      ws.onopen = () => {
+        if (relayWsRef.current !== ws || runIdRef.current !== myRunId) {
+          ws.close();
+          return;
+        }
+
+        relayTimerRef.current = window.setInterval(() => {
+          if (
+            relayWsRef.current !== ws ||
+            ws.readyState !== WebSocket.OPEN ||
+            sendingFrameRef.current ||
+            ws.bufferedAmount >= RELAY_MAX_BUFFERED_BYTES
+          ) {
+            return;
+          }
+
+          const video = videoRef.current;
+          const overlayCanvas = canvasRef.current;
+          if (
+            !video ||
+            !overlayCanvas ||
+            !relayCtx ||
+            video.readyState < 2 ||
+            video.videoWidth <= 0 ||
+            video.videoHeight <= 0
+          ) {
+            return;
+          }
+
+          const scale = Math.min(1, RELAY_MAX_WIDTH / video.videoWidth);
+          const targetW = Math.max(2, Math.round(video.videoWidth * scale));
+          const targetH = Math.max(2, Math.round(video.videoHeight * scale));
+          if (relayCanvas.width !== targetW || relayCanvas.height !== targetH) {
+            relayCanvas.width = targetW;
+            relayCanvas.height = targetH;
+          }
+
+          relayCtx.drawImage(video, 0, 0, targetW, targetH);
+          if (overlayCanvas.width > 0 && overlayCanvas.height > 0) {
+            relayCtx.drawImage(overlayCanvas, 0, 0, targetW, targetH);
+          }
+
+          sendingFrameRef.current = true;
+          relayCanvas.toBlob(
+            (blob) => {
+              sendingFrameRef.current = false;
+              if (
+                blob &&
+                relayWsRef.current === ws &&
+                ws.readyState === WebSocket.OPEN &&
+                ws.bufferedAmount < RELAY_MAX_BUFFERED_BYTES
+              ) {
+                ws.send(blob);
+              }
+            },
+            "image/jpeg",
+            RELAY_JPEG_QUALITY,
+          );
+        }, RELAY_FRAME_INTERVAL_MS);
+
+        relayPingTimerRef.current = window.setInterval(() => {
+          if (relayWsRef.current === ws && ws.readyState === WebSocket.OPEN) {
+            ws.send("PING");
+          }
+        }, RELAY_PING_INTERVAL_MS);
+      };
+
+      ws.onclose = () => {
+        if (relayWsRef.current === ws) {
+          clearRelayTimers();
+          relayWsRef.current = null;
+        }
+      };
+
+      ws.onerror = () => {
+        if (relayWsRef.current === ws) {
+          clearRelayTimers();
+        }
+      };
+    } catch (err) {
+      console.warn("Gagal memulai relay siaran kamera device:", err);
+    }
+  }
+
   function stopLoopAndMedia(invalidateRun = true) {
     if (invalidateRun) {
       runIdRef.current += 1;
     }
+    stopRelayPublisher();
     cancelActiveClipRecording();
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
@@ -378,27 +511,36 @@ export function OnDeviceCamera({
         );
       }
 
-      // Gunakan klip pre-fall (+3.5 dtk post-fall) atau fallback rekam 4.5 dtk jika belum aktif
+      // Tahap 1 — Instan: kirim alert + snapshot segera agar langsung masuk Riwayat & Push
+      const formData = new FormData();
+      if (cameraId && !cameraId.startsWith("device-")) {
+        formData.append("camera_id", cameraId);
+      }
+      formData.append("camera_name", cameraName || "Kamera Device");
+      formData.append("location", cameraLocation || "Perangkat Lokal");
+      const user = getUser();
+      if (user?.elderly_name) {
+        formData.append("person_name", user.elderly_name);
+      }
+      formData.append("confidence", String(Number(confidence.toFixed(2))));
+      formData.append("clip_duration", "0 dtk");
+      if (thumbnailBlob) {
+        formData.append("thumbnail", thumbnailBlob, "fall-snapshot.jpg");
+      }
+
+      const created = await incidentApi.reportOnDeviceAlert(formData);
+
+      // Tahap 2 — Async: tunggu klip pre-fall (+3.5 dtk post-fall) selesai lalu unggah terpisah
       const recordedClip = clipPromise
         ? await clipPromise
         : await recordClipBlob(video, overlayCanvas, FALLBACK_CLIP_DURATION_MS);
 
-      const formData = new FormData();
-      formData.append("camera_id", cameraId || "on-device");
-      formData.append("camera_name", cameraName || "Kamera Device");
-      formData.append("location", cameraLocation || "Perangkat Lokal");
-      formData.append("confidence", String(Number(confidence.toFixed(2))));
-      if (recordedClip) {
-        formData.append("clip_duration_seconds", String(recordedClip.durationSeconds));
+      if (created?.id && recordedClip) {
+        const clipForm = new FormData();
+        clipForm.append("clip", recordedClip.blob, getClipFilename(recordedClip.mimeType));
+        clipForm.append("clip_duration", `${recordedClip.durationSeconds} dtk`);
+        await incidentApi.uploadIncidentClip(created.id, clipForm);
       }
-      if (thumbnailBlob) {
-        formData.append("thumbnail", thumbnailBlob, "fall-snapshot.jpg");
-      }
-      if (recordedClip) {
-        formData.append("clip", recordedClip.blob, getClipFilename(recordedClip.mimeType));
-      }
-
-      await incidentApi.handleIncidentAlert(formData);
     } catch (err) {
       console.warn("Gagal mencatat insiden kamera device ke Riwayat:", err);
     }
@@ -541,6 +683,7 @@ export function OnDeviceCamera({
       }
       setMode("webcam");
       startDetectionLoop(detector, myRunId);
+      startRelayPublisher(myRunId);
     } catch (err) {
       if (runIdRef.current === myRunId) {
         stopLoopAndMedia(false);
@@ -604,6 +747,7 @@ export function OnDeviceCamera({
       }
       setMode("video");
       startDetectionLoop(detector, myRunId);
+      startRelayPublisher(myRunId);
     } catch (err) {
       if (runIdRef.current === myRunId) {
         stopLoopAndMedia(false);

@@ -15,6 +15,58 @@ export type SavedCamera = {
 };
 
 const CAMERAS_CHANGED_EVENT = "rumi:cameras-changed";
+const DEVICE_ID_KEY = "rumi_client_device_id";
+const DISABLED_DEVICE_CAMERAS_KEY = "rumi_disabled_device_cameras";
+
+function readDisabledDeviceCameraIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(DISABLED_DEVICE_CAMERAS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((item): item is string => typeof item === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function setDeviceCameraManuallyDisabled(id: string, disabled: boolean): void {
+  if (typeof window === "undefined") return;
+  const set = readDisabledDeviceCameraIds();
+  if (disabled) {
+    set.add(id);
+  } else {
+    set.delete(id);
+  }
+  window.localStorage.setItem(DISABLED_DEVICE_CAMERAS_KEY, JSON.stringify(Array.from(set)));
+}
+
+export function getLocalDeviceId(): string {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(DEVICE_ID_KEY);
+  if (existing) return existing;
+  const created = `dev-${generateUuid()}`;
+  window.localStorage.setItem(DEVICE_ID_KEY, created);
+  return created;
+}
+
+export function getDeviceOwnerId(url: string): string | null {
+  const trimmed = url.trim();
+  const qIdx = trimmed.indexOf("?");
+  if (qIdx === -1) return null;
+  const params = new URLSearchParams(trimmed.slice(qIdx + 1));
+  return params.get("owner")?.trim() || null;
+}
+
+export function isLocalOwnedDeviceCamera(url: string, cameraId?: string): boolean {
+  if (!isDeviceCameraUrl(url)) return false;
+  const owner = getDeviceOwnerId(url);
+  if (owner) {
+    return owner === getLocalDeviceId();
+  }
+  return cameraId ? cameraId.startsWith("device-") : true;
+}
 
 function generateUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -41,15 +93,18 @@ export function isDeviceCameraUrl(url: string): boolean {
 }
 
 export function getDeviceFacingMode(url: string): DeviceFacingMode {
-  return url.trim().toLowerCase() === "device://user" ? "user" : "environment";
+  const base = url.trim().split("?")[0]?.toLowerCase() ?? "";
+  return base === "device://user" ? "user" : "environment";
 }
 
 export function normalizeCameraUrl(url: string) {
   const trimmedUrl = url.trim();
   if (isDeviceCameraUrl(trimmedUrl)) {
-    return trimmedUrl.toLowerCase() === "device://user"
-      ? "device://user"
-      : "device://environment";
+    const facing = getDeviceFacingMode(trimmedUrl);
+    const owner = getDeviceOwnerId(trimmedUrl);
+    return owner
+      ? `device://${facing}?owner=${encodeURIComponent(owner)}`
+      : `device://${facing}`;
   }
   if (!/^https?:\/\//i.test(trimmedUrl)) return trimmedUrl;
 
@@ -91,18 +146,29 @@ function writeCachedCameras(cameras: SavedCamera[]) {
 }
 
 export async function fetchCameras(): Promise<SavedCamera[]> {
-  const localDeviceCameras = readCachedCameras().filter((c) => c.protocol === "DEVICE");
+  const legacyLocalDeviceCameras = readCachedCameras().filter((c) => c.id.startsWith("device-"));
+  const manuallyDisabled = readDisabledDeviceCameraIds();
   try {
     const remoteCameras = await cameraApi.list();
-    const formatted: SavedCamera[] = remoteCameras.map((c) => ({
-      id: c.id,
-      name: c.name,
-      location: c.location,
-      url: normalizeCameraUrl(c.url),
-      protocol: c.protocol,
-      status: c.status,
-    }));
-    const merged = [...formatted, ...localDeviceCameras];
+    const formatted: SavedCamera[] = remoteCameras.map((c) => {
+      const normalized = normalizeCameraUrl(c.url);
+      const isOwnedDevice =
+        c.protocol === "DEVICE" && isLocalOwnedDeviceCamera(normalized, c.id);
+      const resolvedStatus: "online" | "offline" = isOwnedDevice
+        ? manuallyDisabled.has(c.id)
+          ? "offline"
+          : "online"
+        : c.status;
+      return {
+        id: c.id,
+        name: c.name,
+        location: c.location,
+        url: normalized,
+        protocol: c.protocol,
+        status: resolvedStatus,
+      };
+    });
+    const merged = [...formatted, ...legacyLocalDeviceCameras];
     writeCachedCameras(merged);
     return merged;
   } catch (err) {
@@ -114,47 +180,38 @@ export async function fetchCameras(): Promise<SavedCamera[]> {
 export async function addCamera(camera: { name: string; location: string; url: string }) {
   const normalizedUrl = normalizeCameraUrl(camera.url);
   const protocol = getCameraProtocol(normalizedUrl);
-
-  if (protocol === "DEVICE") {
-    const deviceCamera: SavedCamera = {
-      id: `device-${generateUuid()}`,
-      name: camera.name,
-      location: camera.location,
-      url: normalizedUrl,
-      protocol: "DEVICE",
-      status: "online",
-    };
-    writeCachedCameras([...readCachedCameras(), deviceCamera]);
-    return deviceCamera;
-  }
+  const payloadUrl =
+    protocol === "DEVICE"
+      ? `device://${getDeviceFacingMode(normalizedUrl)}?owner=${encodeURIComponent(getDeviceOwnerId(normalizedUrl) || getLocalDeviceId())}`
+      : normalizedUrl;
 
   try {
     const created = await cameraApi.create({
       name: camera.name,
       location: camera.location,
-      url: normalizedUrl,
+      url: payloadUrl,
     });
     const current = readCachedCameras();
-    const updated = [
-      ...current,
-      {
-        id: created.id,
-        name: created.name,
-        location: created.location,
-        url: normalizeCameraUrl(created.url),
-        protocol: created.protocol,
-        status: created.status,
-      },
-    ];
-    writeCachedCameras(updated);
-    return created;
+    const formatted: SavedCamera = {
+      id: created.id,
+      name: created.name,
+      location: created.location,
+      url: normalizeCameraUrl(created.url),
+      protocol: created.protocol,
+      status: protocol === "DEVICE" ? "online" : created.status,
+    };
+    if (protocol === "DEVICE") {
+      setDeviceCameraManuallyDisabled(created.id, false);
+    }
+    writeCachedCameras([...current, formatted]);
+    return formatted;
   } catch (err) {
-    // Fallback locally
+    console.warn("Could not save camera on backend, falling back locally:", err);
     const localCamera: SavedCamera = {
-      id: generateUuid(),
+      id: protocol === "DEVICE" ? `device-${generateUuid()}` : generateUuid(),
       name: camera.name,
       location: camera.location,
-      url: normalizedUrl,
+      url: payloadUrl,
       protocol,
       status: "online",
     };
@@ -171,11 +228,15 @@ export async function updateCamera(
   const target = current.find((c) => c.id === id);
   if (!target) return null;
 
-  const normalizedUrl = data.url !== undefined ? normalizeCameraUrl(data.url) : target.url;
-  const nextProtocol = getCameraProtocol(normalizedUrl);
-  const isLocalDevice = id.startsWith("device-") || target.protocol === "DEVICE";
+  const rawUrl = data.url !== undefined ? normalizeCameraUrl(data.url) : target.url;
+  const nextProtocol = getCameraProtocol(rawUrl);
+  const normalizedUrl =
+    nextProtocol === "DEVICE"
+      ? `device://${getDeviceFacingMode(rawUrl)}?owner=${encodeURIComponent(getDeviceOwnerId(rawUrl) || getDeviceOwnerId(target.url) || getLocalDeviceId())}`
+      : rawUrl;
+  const isLocalOnly = id.startsWith("device-");
 
-  if (isLocalDevice && nextProtocol === "DEVICE") {
+  if (isLocalOnly && nextProtocol === "DEVICE") {
     const updatedLocal: SavedCamera = {
       ...target,
       name: data.name ?? target.name,
@@ -187,7 +248,7 @@ export async function updateCamera(
     return updatedLocal;
   }
 
-  if (isLocalDevice && nextProtocol !== "DEVICE") {
+  if (isLocalOnly && nextProtocol !== "DEVICE") {
     const created = await cameraApi.create({
       name: data.name ?? target.name,
       location: data.location ?? target.location,
@@ -231,10 +292,16 @@ export async function updateCameraStatus(
   const target = current.find((c) => c.id === id);
   if (!target) return null;
 
-  const isLocalDevice = id.startsWith("device-") || target.protocol === "DEVICE";
+  const isLocalOnly = id.startsWith("device-");
+  const isOwnedDevice =
+    target.protocol === "DEVICE" && isLocalOwnedDeviceCamera(target.url, target.id);
+  if (isOwnedDevice) {
+    setDeviceCameraManuallyDisabled(id, status === "offline");
+  }
+
   let nextStatus = status;
 
-  if (!isLocalDevice) {
+  if (!isLocalOnly) {
     const updatedRemote = await cameraApi.updateStatus(id, status);
     nextStatus = updatedRemote.status || status;
   }
@@ -246,10 +313,10 @@ export async function updateCameraStatus(
 
 export async function removeCamera(id: string) {
   const current = readCachedCameras();
-  const target = current.find((c) => c.id === id);
-  const isLocalDevice = id.startsWith("device-") || target?.protocol === "DEVICE";
+  const isLocalOnly = id.startsWith("device-");
+  setDeviceCameraManuallyDisabled(id, false);
 
-  if (!isLocalDevice) {
+  if (!isLocalOnly) {
     try {
       await cameraApi.delete(id);
     } catch (err) {

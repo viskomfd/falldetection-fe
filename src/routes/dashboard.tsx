@@ -147,12 +147,14 @@ function Dashboard() {
     }
   }
 
-  const localDeviceCamerasCount = savedCameras.filter((c) => c.protocol === "DEVICE").length;
+  const localOnlyCameras = savedCameras.filter((c) => c.id.startsWith("device-"));
+  const localOnlyCount = localOnlyCameras.length;
+  const localOnlyActiveCount = localOnlyCameras.filter((c) => c.status !== "offline").length;
   const totalCameras =
-    stats !== null ? stats.total_cameras + localDeviceCamerasCount : savedCameras.length;
+    stats !== null ? stats.total_cameras + localOnlyCount : savedCameras.length;
   const activeCamerasCount =
     stats !== null
-      ? stats.active_cameras + localDeviceCamerasCount
+      ? stats.active_cameras + localOnlyActiveCount
       : savedCameras.filter((c) => c.status !== "offline").length;
   const unavailableCameraCount = Math.max(0, totalCameras - activeCamerasCount);
   const uptime = stats?.uptime_percentage ?? 99.6;

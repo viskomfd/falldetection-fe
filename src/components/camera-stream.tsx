@@ -5,6 +5,7 @@ import { OnDeviceCamera } from "@/components/on-device-camera";
 import { API_BASE_URL } from "@/lib/api";
 import {
   getDeviceFacingMode,
+  isLocalOwnedDeviceCamera,
   normalizeCameraUrl,
   type CameraProtocol,
 } from "@/lib/cameras";
@@ -35,10 +36,11 @@ export function CameraStream({
 
   const isOffline = status === "offline";
   const isDeviceCamera = protocol === "DEVICE";
+  const isLocalDeviceOwner = isDeviceCamera && isLocalOwnedDeviceCamera(url, cameraId);
+  const isRemoteDeviceViewer = isDeviceCamera && !isLocalDeviceOwner;
 
-  // Alirkan seluruh kamera terdaftar via backend proxy agar diproses oleh model YOLO11
-  // (menampilkan bounding box & pose skeleton)
-  const isBackendStream = Boolean(cameraId) && !isDeviceCamera;
+  // Alirkan kamera CCTV & kamera device milik perangkat lain via backend MJPEG stream
+  const isBackendStream = Boolean(cameraId) && !isLocalDeviceOwner;
   const basePlaybackUrl = isBackendStream
     ? `${API_BASE_URL}/api/cameras/${cameraId}/stream`
     : normalizeCameraUrl(url);
@@ -51,7 +53,7 @@ export function CameraStream({
   // Tangani perpindahan tab browser: saat tab aktif kembali, segarkan koneksi stream
   // agar frame tidak freeze akibat browser men-throttle background tab
   useEffect(() => {
-    if (isDeviceCamera || isOffline) return;
+    if (isLocalDeviceOwner || isOffline) return;
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setReloadKey((prev) => prev + 1);
@@ -61,13 +63,16 @@ export function CameraStream({
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isDeviceCamera, isOffline]);
+  }, [isLocalDeviceOwner, isOffline]);
 
   useEffect(() => {
-    if (isDeviceCamera || isOffline || !failed) return;
-    const retryTimer = window.setTimeout(() => setFailed(false), 4000);
+    if (isLocalDeviceOwner || isOffline || !failed) return;
+    const retryTimer = window.setTimeout(() => {
+      setReloadKey((prev) => prev + 1);
+      setFailed(false);
+    }, 4500);
     return () => window.clearTimeout(retryTimer);
-  }, [isDeviceCamera, isOffline, failed, playbackUrl]);
+  }, [isLocalDeviceOwner, isOffline, failed, playbackUrl]);
 
   if (isOffline) {
     return (
@@ -76,18 +81,24 @@ export function CameraStream({
       >
         <CameraOff className="size-8 text-muted-foreground/60" />
         <p className="text-sm font-bold text-muted-foreground">
-          {isDeviceCamera ? "Kamera Dinonaktifkan" : "Kamera Offline"}
+          {isRemoteDeviceViewer
+            ? "Kamera Perangkat Offline"
+            : isDeviceCamera
+              ? "Kamera Dinonaktifkan"
+              : "Kamera Offline"}
         </p>
         <p className="text-xs text-muted-foreground/70">
-          {isDeviceCamera
-            ? `${name} · aktifkan kembali untuk melanjutkan deteksi`
-            : `${name} · stream terputus atau dinonaktifkan`}
+          {isRemoteDeviceViewer
+            ? `${name} · Menunggu siaran dari perangkat pemilik`
+            : isDeviceCamera
+              ? `${name} · aktifkan kembali untuk melanjutkan deteksi`
+              : `${name} · stream terputus atau dinonaktifkan`}
         </p>
       </div>
     );
   }
 
-  if (isDeviceCamera) {
+  if (isLocalDeviceOwner) {
     return (
       <OnDeviceCamera
         cameraId={cameraId}
@@ -105,9 +116,13 @@ export function CameraStream({
         className={`camera-stream-offline flex aspect-video w-full flex-col items-center justify-center gap-2 bg-muted p-6 text-center ${className ?? ""}`}
       >
         <Cctv className="size-8 text-muted-foreground/60" />
-        <p className="text-sm font-bold text-muted-foreground">Kamera Offline</p>
+        <p className="text-sm font-bold text-muted-foreground">
+          {isRemoteDeviceViewer ? "Kamera Perangkat Offline" : "Kamera Offline"}
+        </p>
         <p className="text-xs text-muted-foreground/70">
-          {name} · mencoba tersambung ulang
+          {isRemoteDeviceViewer
+            ? `${name} · Menunggu siaran dari perangkat pemilik`
+            : `${name} · mencoba tersambung ulang`}
         </p>
         <RefreshCw className="size-4 text-muted-foreground/60" />
       </div>
