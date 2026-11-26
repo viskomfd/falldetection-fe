@@ -6,6 +6,8 @@ import {
   Loader2,
   MapPin,
   Plus,
+  Power,
+  RotateCcw,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
@@ -26,10 +28,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { modelApi } from "@/lib/api";
 import {
   addCamera,
   getDeviceFacingMode,
   removeCamera,
+  updateCameraStatus,
   useSavedCameras,
   type DeviceFacingMode,
 } from "@/lib/cameras";
@@ -51,7 +55,11 @@ function DeviceCameraPreview({ facingMode }: { facingMode: DeviceFacingMode }) {
 
       if (!navigator.mediaDevices?.getUserMedia) {
         setLoading(false);
-        setError("Browser tidak mendukung preview kamera.");
+        setError(
+          typeof window !== "undefined" && !window.isSecureContext
+            ? "Akses kamera diblokir browser pada koneksi HTTP. Gunakan HTTPS (mis. ngrok / Cloudflare Tunnel) atau localhost."
+            : "Browser tidak mendukung preview kamera.",
+        );
         return;
       }
 
@@ -164,6 +172,10 @@ function KameraPage() {
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState("");
+  const [resettingTrackers, setResettingTrackers] = useState(false);
+  const [trackerStatus, setTrackerStatus] = useState("");
 
   function handleDialogOpenChange(open: boolean) {
     setDialogOpen(open);
@@ -212,6 +224,36 @@ function KameraPage() {
     }
   }
 
+  async function handleToggleStatus(id: string, currentStatus?: "online" | "offline") {
+    const nextStatus: "online" | "offline" = currentStatus === "offline" ? "online" : "offline";
+    setStatusError("");
+    try {
+      setTogglingId(id);
+      await updateCameraStatus(id, nextStatus);
+    } catch (error) {
+      setStatusError(
+        error instanceof Error ? error.message : "Status kamera gagal diperbarui.",
+      );
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleResetTrackers() {
+    setResettingTrackers(true);
+    setTrackerStatus("");
+    try {
+      const res = await modelApi.resetTrackers();
+      setTrackerStatus(res.message || "Tracker AI berhasil direset.");
+    } catch (error) {
+      setTrackerStatus(
+        error instanceof Error ? error.message : "Tracker AI gagal direset.",
+      );
+    } finally {
+      setResettingTrackers(false);
+    }
+  }
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
@@ -222,13 +264,28 @@ function KameraPage() {
               Daftarkan kamera device atau stream RTSP/HTTP untuk diproses model deteksi jatuh.
             </p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-            <DialogTrigger asChild>
-              <Button className="w-full rounded-full sm:w-auto">
-                <Plus className="size-4" />
-                Tambah Kamera
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full rounded-full bg-card sm:w-auto"
+              disabled={resettingTrackers}
+              onClick={() => void handleResetTrackers()}
+            >
+              {resettingTrackers ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RotateCcw className="size-4" />
+              )}
+              {resettingTrackers ? "Mereset..." : "Reset Tracker AI"}
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+              <DialogTrigger asChild>
+                <Button className="w-full rounded-full sm:w-auto">
+                  <Plus className="size-4" />
+                  Tambah Kamera
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl border-border bg-card sm:max-w-xl">
               <DialogHeader>
                 <DialogTitle>Tambah kamera baru</DialogTitle>
@@ -371,7 +428,23 @@ function KameraPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
+
+        {(trackerStatus || statusError) && (
+          <div className="flex flex-col gap-1 px-1 sm:px-2">
+            {trackerStatus && (
+              <p role="status" className="text-xs font-semibold text-primary">
+                {trackerStatus}
+              </p>
+            )}
+            {statusError && (
+              <p role="alert" className="text-xs font-semibold text-destructive">
+                {statusError}
+              </p>
+            )}
+          </div>
+        )}
 
         {savedCameras.length === 0 ? (
           <div className="card-shadow flex flex-col items-center justify-center rounded-3xl bg-card p-6 text-center sm:p-12">
@@ -403,6 +476,7 @@ function KameraPage() {
                       location={camera.location}
                       url={camera.url}
                       protocol={camera.protocol}
+                      status={camera.status}
                     />
                     <span className="camera-live-only absolute left-3 top-3">
                       <Badge className="rounded-full bg-primary">
@@ -436,6 +510,21 @@ function KameraPage() {
                       {sourceLabel}
                     </p>
                     <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full bg-card"
+                        disabled={togglingId === camera.id}
+                        onClick={() => void handleToggleStatus(camera.id, camera.status)}
+                      >
+                        {togglingId === camera.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Power className="size-4" />
+                        )}
+                        {isOffline ? "Aktifkan" : "Nonaktifkan"}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

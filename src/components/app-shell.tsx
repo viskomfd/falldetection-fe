@@ -18,6 +18,7 @@ import {
   authApi,
   getToken,
   getUser,
+  healthApi,
   incidentApi,
   WS_BASE_URL,
   type Incident,
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(() => getUser());
   const [floatingAlert, setFloatingAlert] = useState<Incident | null>(null);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
     const authenticated = Boolean(getToken());
@@ -58,6 +60,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    // Check backend API health
+    healthApi
+      .check()
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false));
     // Sync current user profile from backend
     authApi
       .getMe()
@@ -188,6 +195,25 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+
+        <div className="mb-2 flex items-center gap-2 rounded-2xl bg-muted px-3.5 py-2 text-xs font-semibold text-muted-foreground">
+          <span
+            className={`size-2 shrink-0 rounded-full ${
+              apiOnline === true
+                ? "bg-success"
+                : apiOnline === false
+                  ? "bg-destructive"
+                  : "bg-muted-foreground/40"
+            }`}
+          />
+          <span>
+            {apiOnline === true
+              ? "Server API Online"
+              : apiOnline === false
+                ? "Server API Offline"
+                : "Memeriksa Server..."}
+          </span>
+        </div>
 
         <button
           type="button"

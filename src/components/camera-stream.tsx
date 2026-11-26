@@ -1,4 +1,4 @@
-import { Cctv, RefreshCw } from "lucide-react";
+import { CameraOff, Cctv, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { OnDeviceCamera } from "@/components/on-device-camera";
@@ -15,6 +15,7 @@ type CameraStreamProps = {
   location?: string;
   url: string;
   protocol: CameraProtocol;
+  status?: "online" | "offline" | undefined;
   className?: string;
 };
 
@@ -24,11 +25,13 @@ export function CameraStream({
   location,
   url,
   protocol,
+  status = "online",
   className,
 }: CameraStreamProps) {
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const isOffline = status === "offline";
   const isDeviceCamera = protocol === "DEVICE";
 
   // Alirkan seluruh kamera terdaftar via backend proxy agar diproses oleh model YOLO11
@@ -46,7 +49,7 @@ export function CameraStream({
   // Tangani perpindahan tab browser: saat tab aktif kembali, segarkan koneksi stream
   // agar frame tidak freeze akibat browser men-throttle background tab
   useEffect(() => {
-    if (isDeviceCamera) return;
+    if (isDeviceCamera || isOffline) return;
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         setReloadKey((prev) => prev + 1);
@@ -56,13 +59,27 @@ export function CameraStream({
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isDeviceCamera]);
+  }, [isDeviceCamera, isOffline]);
 
   useEffect(() => {
-    if (isDeviceCamera || !failed) return;
+    if (isDeviceCamera || isOffline || !failed) return;
     const retryTimer = window.setTimeout(() => setFailed(false), 4000);
     return () => window.clearTimeout(retryTimer);
-  }, [isDeviceCamera, failed, playbackUrl]);
+  }, [isDeviceCamera, isOffline, failed, playbackUrl]);
+
+  if (isOffline) {
+    return (
+      <div
+        className={`camera-stream-offline flex aspect-video w-full flex-col items-center justify-center gap-2 bg-muted p-6 text-center ${className ?? ""}`}
+      >
+        <CameraOff className="size-8 text-muted-foreground/60" />
+        <p className="text-sm font-bold text-muted-foreground">Kamera Dinonaktifkan</p>
+        <p className="text-xs text-muted-foreground/70">
+          {name} · aktifkan kembali untuk melanjutkan deteksi
+        </p>
+      </div>
+    );
+  }
 
   if (isDeviceCamera) {
     return (

@@ -16,6 +16,21 @@ export type SavedCamera = {
 
 const CAMERAS_CHANGED_EVENT = "rumi:cameras-changed";
 
+function generateUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+    bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function getStorageKey(): string {
   const user = getUser();
   return user?.id ? `rumi-cameras_${user.id}` : "rumi-cameras_guest";
@@ -102,7 +117,7 @@ export async function addCamera(camera: { name: string; location: string; url: s
 
   if (protocol === "DEVICE") {
     const deviceCamera: SavedCamera = {
-      id: `device-${crypto.randomUUID()}`,
+      id: `device-${generateUuid()}`,
       name: camera.name,
       location: camera.location,
       url: normalizedUrl,
@@ -136,7 +151,7 @@ export async function addCamera(camera: { name: string; location: string; url: s
   } catch (err) {
     // Fallback locally
     const localCamera: SavedCamera = {
-      id: crypto.randomUUID(),
+      id: generateUuid(),
       name: camera.name,
       location: camera.location,
       url: normalizedUrl,
@@ -146,6 +161,27 @@ export async function addCamera(camera: { name: string; location: string; url: s
     writeCachedCameras([...readCachedCameras(), localCamera]);
     return localCamera;
   }
+}
+
+export async function updateCameraStatus(
+  id: string,
+  status: "online" | "offline",
+): Promise<SavedCamera | null> {
+  const current = readCachedCameras();
+  const target = current.find((c) => c.id === id);
+  if (!target) return null;
+
+  const isLocalDevice = id.startsWith("device-") || target.protocol === "DEVICE";
+  let nextStatus = status;
+
+  if (!isLocalDevice) {
+    const updatedRemote = await cameraApi.updateStatus(id, status);
+    nextStatus = updatedRemote.status || status;
+  }
+
+  const updatedCamera: SavedCamera = { ...target, status: nextStatus };
+  writeCachedCameras(current.map((c) => (c.id === id ? updatedCamera : c)));
+  return updatedCamera;
 }
 
 export async function removeCamera(id: string) {

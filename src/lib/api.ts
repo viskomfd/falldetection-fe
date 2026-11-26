@@ -1,9 +1,39 @@
 // Centralized API Client for Rumi Frontend
 
-export const API_BASE_URL =
+const RAW_API_BASE_URL =
   (import.meta.env["VITE_API_BASE_URL"] as string) || "http://localhost:8000";
-export const WS_BASE_URL =
+const RAW_WS_BASE_URL =
   (import.meta.env["VITE_WS_URL"] as string) || "ws://localhost:8000/ws/alerts";
+
+function resolveApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const isHttps = window.location.protocol === "https:";
+    const isRemoteHost =
+      window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+    const pointsToLocalHttp = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(RAW_API_BASE_URL);
+    if ((isHttps && RAW_API_BASE_URL.startsWith("http://")) || (isRemoteHost && pointsToLocalHttp)) {
+      return window.location.origin;
+    }
+  }
+  return RAW_API_BASE_URL;
+}
+
+function resolveWsBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const isHttps = window.location.protocol === "https:";
+    const isRemoteHost =
+      window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+    const pointsToLocalWs = /^ws:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(RAW_WS_BASE_URL);
+    if ((isHttps && RAW_WS_BASE_URL.startsWith("ws://")) || (isRemoteHost && pointsToLocalWs)) {
+      const wsProto = isHttps ? "wss:" : "ws:";
+      return `${wsProto}//${window.location.host}/ws/alerts`;
+    }
+  }
+  return RAW_WS_BASE_URL;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+export const WS_BASE_URL = resolveWsBaseUrl();
 
 // ========================
 // TYPES & INTERFACES
@@ -237,6 +267,21 @@ export const authApi = {
   },
 };
 
+export interface ModelStatus {
+  model_file: string;
+  is_model_loaded: boolean;
+  mode: string;
+  thresholds?: Record<string, number>;
+  message: string;
+}
+
+export interface HealthStatus {
+  status?: string;
+  message?: string;
+  service?: string;
+  version?: string;
+}
+
 export const cameraApi = {
   async list(): Promise<Camera[]> {
     return apiRequest<Camera[]>("/api/cameras");
@@ -247,6 +292,15 @@ export const cameraApi = {
       method: "POST",
       body: JSON.stringify(data),
     });
+  },
+
+  async updateStatus(cameraId: string, status: "online" | "offline"): Promise<Camera> {
+    return apiRequest<Camera>(
+      `/api/cameras/${cameraId}/status?status=${encodeURIComponent(status)}`,
+      {
+        method: "PATCH",
+      },
+    );
   },
 
   async delete(cameraId: string): Promise<{ message: string; id: string }> {
@@ -276,18 +330,8 @@ export const incidentApi = {
     });
   },
 
-  async reportOnDeviceAlert(formData: FormData): Promise<Incident> {
-    return apiRequest<Incident>("/api/incidents/on-device-alert", {
-      method: "POST",
-      body: formData,
-    });
-  },
-
-  async uploadIncidentClip(
-    incidentId: string,
-    formData: FormData,
-  ): Promise<{ status: string; incident_id: string; clip_url: string; clip_duration: string }> {
-    return apiRequest(`/api/incidents/${incidentId}/clip`, {
+  async handleIncidentAlert(formData: FormData): Promise<Incident> {
+    return apiRequest<Incident>("/api/incidents/incident-alerts", {
       method: "POST",
       body: formData,
     });
@@ -301,19 +345,25 @@ export const dashboardApi = {
 };
 
 export const modelApi = {
-  async status(): Promise<{
-    model_file: string;
-    is_model_loaded: boolean;
-    mode: string;
-    thresholds?: Record<string, number>;
-    message: string;
-  }> {
-    return apiRequest("/api/model/status");
+  async status(): Promise<ModelStatus> {
+    return apiRequest<ModelStatus>("/api/model/status");
   },
 
-  async simulateFall(): Promise<unknown> {
+  async simulateFall(): Promise<{ message?: string; incident?: Incident } | unknown> {
     return apiRequest("/api/model/simulate-fall", {
       method: "POST",
     });
+  },
+
+  async resetTrackers(): Promise<{ message?: string; status?: string }> {
+    return apiRequest<{ message?: string; status?: string }>("/api/model/reset-trackers", {
+      method: "POST",
+    });
+  },
+};
+
+export const healthApi = {
+  async check(): Promise<HealthStatus> {
+    return apiRequest<HealthStatus>("/");
   },
 };
