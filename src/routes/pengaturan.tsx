@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BellRing, Cctv, HeartHandshake, Loader2, Lock, Mail, Smartphone } from "lucide-react";
+import {
+  BellRing,
+  Cctv,
+  HeartHandshake,
+  Loader2,
+  Lock,
+  Mail,
+  RotateCcw,
+  Siren,
+  Smartphone,
+} from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -17,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { playFallAlarm, requestDesktopNotificationPermission } from "@/lib/alarm";
-import { authApi, getUser, type User } from "@/lib/api";
+import { authApi, getUser, healthApi, modelApi, type ModelStatus, type User } from "@/lib/api";
 import { getElderlyName, saveElderlyName } from "@/lib/elderly-profile";
 import {
   getNotificationPreferences,
@@ -90,6 +100,12 @@ function PengaturanPage() {
   const [notificationError, setNotificationError] = useState("");
   const [testingNotification, setTestingNotification] = useState(false);
   const [notificationTestStatus, setNotificationTestStatus] = useState("");
+  const [simulatingFall, setSimulatingFall] = useState(false);
+  const [simulateFallStatus, setSimulateFallStatus] = useState("");
+  const [resettingTrackers, setResettingTrackers] = useState(false);
+  const [resetTrackersStatus, setResetTrackersStatus] = useState("");
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
 
   useEffect(() => {
     authApi
@@ -103,6 +119,16 @@ function PengaturanPage() {
       .catch(() => {
         // Fallback to local user
       });
+
+    healthApi
+      .check()
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false));
+
+    modelApi
+      .status()
+      .then((status) => setModelStatus(status))
+      .catch(() => setModelStatus(null));
   }, []);
 
   async function handleLogoutAll() {
@@ -195,6 +221,38 @@ function PengaturanPage() {
     }
   }
 
+  async function handleSimulateFall() {
+    setSimulatingFall(true);
+    setSimulateFallStatus("");
+    try {
+      const result = (await modelApi.simulateFall()) as { message?: string } | null;
+      setSimulateFallStatus(
+        result?.message || "Simulasi kejadian jatuh berhasil dipicu.",
+      );
+    } catch (error) {
+      setSimulateFallStatus(
+        error instanceof Error ? error.message : "Simulasi kejadian jatuh gagal dipicu.",
+      );
+    } finally {
+      setSimulatingFall(false);
+    }
+  }
+
+  async function handleResetTrackers() {
+    setResettingTrackers(true);
+    setResetTrackersStatus("");
+    try {
+      const result = await modelApi.resetTrackers();
+      setResetTrackersStatus(result.message || "Tracker AI berhasil direset.");
+    } catch (error) {
+      setResetTrackersStatus(
+        error instanceof Error ? error.message : "Tracker AI gagal direset.",
+      );
+    } finally {
+      setResettingTrackers(false);
+    }
+  }
+
   const name = currentUser?.name || "Andi Pratama";
   const email = currentUser?.email || "andi.pratama@keluarga.id";
   const role = currentUser?.role || "Pendamping";
@@ -230,8 +288,38 @@ function PengaturanPage() {
               <Badge variant="secondary" className="rounded-full">
                 Peran: {role}
               </Badge>
-              <Badge variant="secondary" className="rounded-full">
-                Sistem AI Aktif
+              <Badge
+                variant="secondary"
+                className={`rounded-full ${
+                  apiOnline === true
+                    ? "bg-success/15 text-success"
+                    : apiOnline === false
+                      ? "bg-destructive/15 text-destructive"
+                      : ""
+                }`}
+              >
+                {apiOnline === true
+                  ? "Server API Online"
+                  : apiOnline === false
+                    ? "Server API Offline"
+                    : "Memeriksa Server..."}
+              </Badge>
+              <Badge
+                variant="secondary"
+                title={modelStatus?.message || modelStatus?.model_file}
+                className={`rounded-full ${
+                  modelStatus
+                    ? modelStatus.is_model_loaded
+                      ? "bg-success/15 text-success"
+                      : "bg-destructive/15 text-destructive"
+                    : ""
+                }`}
+              >
+                {modelStatus
+                  ? modelStatus.is_model_loaded
+                    ? `Model AI Aktif${modelStatus.mode ? ` · ${modelStatus.mode}` : ""}`
+                    : "Model AI Tidak Aktif"
+                  : "Status AI Tidak Diketahui"}
               </Badge>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -322,26 +410,47 @@ function PengaturanPage() {
               <p className="text-xs font-semibold text-destructive">{notificationError}</p>
             )}
             <div className="border-t border-border pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full"
-                disabled={testingNotification}
-                onClick={() => void handleTestNotification()}
-              >
-                {testingNotification ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <BellRing className="size-4" />
-                )}
-                {testingNotification ? "Mengirim..." : "Kirim Test Fall Alert"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={testingNotification}
+                  onClick={() => void handleTestNotification()}
+                >
+                  {testingNotification ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <BellRing className="size-4" />
+                  )}
+                  {testingNotification ? "Mengirim..." : "Kirim Test Fall Alert"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={simulatingFall}
+                  onClick={() => void handleSimulateFall()}
+                >
+                  {simulatingFall ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Siren className="size-4" />
+                  )}
+                  {simulatingFall ? "Memicu..." : "Simulasi Kejadian Jatuh"}
+                </Button>
+              </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Dikirim ke perangkat yang sedang membuka Rumi dengan akun yang sama.
+                Kirim notifikasi uji atau picu simulasi penuh deteksi jatuh ke dashboard dan riwayat.
               </p>
               {notificationTestStatus && (
                 <p role="status" className="mt-2 text-xs font-semibold text-primary">
                   {notificationTestStatus}
+                </p>
+              )}
+              {simulateFallStatus && (
+                <p role="status" className="mt-1 text-xs font-semibold text-destructive">
+                  {simulateFallStatus}
                 </p>
               )}
             </div>
@@ -384,6 +493,30 @@ function PengaturanPage() {
             <p className="text-xs text-muted-foreground">
               Frame extraction berjalan otomatis dan koneksi tersambung ulang sendiri saat terputus.
             </p>
+            <div className="border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                disabled={resettingTrackers}
+                onClick={() => void handleResetTrackers()}
+              >
+                {resettingTrackers ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-4" />
+                )}
+                {resettingTrackers ? "Mereset..." : "Reset Tracker AI"}
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Atur ulang state pelacakan pose AI di server jika deteksi kamera RTSP/HTTP macet.
+              </p>
+              {resetTrackersStatus && (
+                <p role="status" className="mt-2 text-xs font-semibold text-primary">
+                  {resetTrackersStatus}
+                </p>
+              )}
+            </div>
           </section>
 
           {/* Security */}

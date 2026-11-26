@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { playFallAlarm } from "@/lib/alarm";
-import { getUser, incidentApi } from "@/lib/api";
+import { incidentApi } from "@/lib/api";
 import type { DeviceFacingMode } from "@/lib/cameras";
 import {
   drawPoseOverlay,
@@ -90,67 +90,23 @@ export function OnDeviceCamera({
     setInferenceMs(0);
   }
 
-  async function recordOnDeviceFallIncident(
-    video: HTMLVideoElement,
-    overlayCanvas: HTMLCanvasElement,
-    confidence: number,
-  ) {
-    try {
-      const formData = new FormData();
-      if (cameraId) formData.append("camera_id", cameraId);
-      formData.append("camera_name", cameraName || "Kamera Device");
-      formData.append("location", cameraLocation || "Perangkat Lokal");
-      const user = getUser();
-      if (user?.elderly_name) {
-        formData.append("person_name", user.elderly_name);
-      }
-      formData.append("confidence", String(Number(confidence.toFixed(2))));
-      formData.append("clip_duration", "0 dtk");
-
-      // Composite 1-frame snapshot (video + pose overlay) only when a fall is confirmed
-      const snapCanvas = document.createElement("canvas");
-      snapCanvas.width = video.videoWidth || overlayCanvas.width;
-      snapCanvas.height = video.videoHeight || overlayCanvas.height;
-      const snapCtx = snapCanvas.getContext("2d");
-      if (snapCtx && snapCanvas.width > 0 && snapCanvas.height > 0) {
-        snapCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
-        snapCtx.drawImage(overlayCanvas, 0, 0, snapCanvas.width, snapCanvas.height);
-        const blob = await new Promise<Blob | null>((resolve) =>
-          snapCanvas.toBlob((b) => resolve(b), "image/jpeg", 0.85),
-        );
-        if (blob) {
-          formData.append("thumbnail", blob, "fall-snapshot.jpg");
-        }
-      }
-
-      const created = await incidentApi.reportOnDeviceAlert(formData);
-
-      // Rekam klip bukti 5 detik (video + overlay pose) secara non-blocking lalu unggah ke insiden
-      if (created?.id && typeof MediaRecorder !== "undefined") {
-        void recordAndUploadClip(created.id, video, overlayCanvas, 5000);
-      }
-    } catch (err) {
-      console.warn("Gagal mencatat insiden kamera device ke Riwayat:", err);
-    }
-  }
-
-  async function recordAndUploadClip(
-    incidentId: string,
+  async function recordClipBlob(
     video: HTMLVideoElement,
     overlayCanvas: HTMLCanvasElement,
     durationMs = 5000,
-  ) {
+  ): Promise<{ blob: Blob; durationSeconds: number } | null> {
     try {
+      if (typeof MediaRecorder === "undefined") return null;
       const srcW = video.videoWidth || overlayCanvas.width;
       const srcH = video.videoHeight || overlayCanvas.height;
-      if (!srcW || !srcH) return;
+      if (!srcW || !srcH) return null;
 
       const scale = Math.min(1, 640 / srcW);
       const recCanvas = document.createElement("canvas");
       recCanvas.width = Math.max(2, Math.round(srcW * scale));
       recCanvas.height = Math.max(2, Math.round(srcH * scale));
       const recCtx = recCanvas.getContext("2d");
-      if (!recCtx || typeof recCanvas.captureStream !== "function") return;
+      if (!recCtx || typeof recCanvas.captureStream !== "function") return null;
 
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
         ? "video/webm;codecs=vp8"
@@ -198,15 +154,56 @@ export function OnDeviceCamera({
         }, durationMs);
       });
 
-      if (!blob || blob.size < 1024) return;
-
-      const secs = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
-      const clipForm = new FormData();
-      clipForm.append("clip", blob, "fall-clip.webm");
-      clipForm.append("clip_duration", `${secs} dtk`);
-      await incidentApi.uploadIncidentClip(incidentId, clipForm);
+      if (!blob || blob.size < 1024) return null;
+      const durationSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      return { blob, durationSeconds };
     } catch (err) {
-      console.warn("Gagal merekam/mengunggah klip kamera device:", err);
+      console.warn("Gagal merekam klip kamera device:", err);
+      return null;
+    }
+  }
+
+  async function recordOnDeviceFallIncident(
+    video: HTMLVideoElement,
+    overlayCanvas: HTMLCanvasElement,
+    confidence: number,
+  ) {
+    try {
+      // Composite 1-frame snapshot (video + pose overlay) when a fall is confirmed
+      let thumbnailBlob: Blob | null = null;
+      const snapCanvas = document.createElement("canvas");
+      snapCanvas.width = video.videoWidth || overlayCanvas.width;
+      snapCanvas.height = video.videoHeight || overlayCanvas.height;
+      const snapCtx = snapCanvas.getContext("2d");
+      if (snapCtx && snapCanvas.width > 0 && snapCanvas.height > 0) {
+        snapCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
+        snapCtx.drawImage(overlayCanvas, 0, 0, snapCanvas.width, snapCanvas.height);
+        thumbnailBlob = await new Promise<Blob | null>((resolve) =>
+          snapCanvas.toBlob((b) => resolve(b), "image/jpeg", 0.85),
+        );
+      }
+
+      // Rekam klip bukti 5 detik (video + overlay pose) jika didukung browser
+      const recordedClip = await recordClipBlob(video, overlayCanvas, 5000);
+
+      const formData = new FormData();
+      formData.append("camera_id", cameraId || "on-device");
+      formData.append("camera_name", cameraName || "Kamera Device");
+      formData.append("location", cameraLocation || "Perangkat Lokal");
+      formData.append("confidence", String(Number(confidence.toFixed(2))));
+      if (recordedClip) {
+        formData.append("clip_duration_seconds", String(recordedClip.durationSeconds));
+      }
+      if (thumbnailBlob) {
+        formData.append("thumbnail", thumbnailBlob, "fall-snapshot.jpg");
+      }
+      if (recordedClip) {
+        formData.append("clip", recordedClip.blob, "fall-clip.webm");
+      }
+
+      await incidentApi.handleIncidentAlert(formData);
+    } catch (err) {
+      console.warn("Gagal mencatat insiden kamera device ke Riwayat:", err);
     }
   }
 
@@ -447,14 +444,14 @@ export function OnDeviceCamera({
         onChange={(e) => void handleSelectVideo(e)}
       />
 
-      {mode === "idle" && (
+      {mode === "idle" && (loadingModel || errorMsg) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-muted p-4 text-center">
           {loadingModel ? (
             <>
               <Loader2 className="size-7 animate-spin text-primary" />
               <p className="text-xs font-bold text-foreground">Menyiapkan kamera & model...</p>
             </>
-          ) : errorMsg ? (
+          ) : (
             <>
               <CameraOff className="size-7 text-destructive/80" />
               <p className="max-w-xs text-xs font-semibold text-destructive">{errorMsg}</p>
@@ -467,32 +464,6 @@ export function OnDeviceCamera({
                 >
                   <Camera className="size-3.5" />
                   Coba Lagi
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 rounded-full px-3 text-xs"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <FileVideo className="size-3.5" />
-                  Video Lokal
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Camera className="size-7 text-muted-foreground/60" />
-              <p className="text-xs font-bold text-muted-foreground">Kamera Device Dijeda</p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs"
-                  onClick={() => void startWebcam(facingMode)}
-                >
-                  <Camera className="size-3.5" />
-                  Mulai
                 </Button>
                 <Button
                   type="button"
@@ -558,15 +529,17 @@ export function OnDeviceCamera({
                 <RotateCcw className="size-3.5" />
               </button>
             )}
-            <button
-              type="button"
-              aria-label="Hentikan kamera device"
-              title="Hentikan kamera"
-              onClick={() => stopLoopAndMedia()}
-              className="flex size-8 items-center justify-center rounded-full bg-destructive/90 text-white backdrop-blur transition-colors hover:bg-destructive"
-            >
-              <CameraOff className="size-3.5" />
-            </button>
+            {mode === "video" && (
+              <button
+                type="button"
+                aria-label="Kembali ke kamera live"
+                title="Kembali ke kamera live"
+                onClick={() => void startWebcam(facingMode)}
+                className="flex size-8 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur transition-colors hover:bg-black/80"
+              >
+                <Camera className="size-3.5" />
+              </button>
+            )}
           </div>
         </>
       )}

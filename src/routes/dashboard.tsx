@@ -17,7 +17,14 @@ import { CameraFullscreenButton } from "@/components/camera-fullscreen-button";
 import { CameraStream } from "@/components/camera-stream";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { dashboardApi, resolveMediaUrl, type DashboardStats, type Incident } from "@/lib/api";
+import {
+  dashboardApi,
+  modelApi,
+  resolveMediaUrl,
+  type DashboardStats,
+  type Incident,
+  type ModelStatus,
+} from "@/lib/api";
 import { useSavedCameras } from "@/lib/cameras";
 import { useElderlyName } from "@/lib/elderly-profile";
 import { getNotificationPreferences } from "@/lib/notification-preferences";
@@ -69,11 +76,12 @@ function Dashboard() {
   const savedCameras = useSavedCameras();
   const elderlyName = useElderlyName();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [activeAlert, setActiveAlert] = useState<Incident | null>(null);
   const notificationPreferences = getNotificationPreferences();
 
   useEffect(() => {
-    // 1. Fetch dashboard stats
+    // 1. Fetch dashboard stats & AI model status
     dashboardApi
       .summary()
       .then((data) => {
@@ -83,6 +91,11 @@ function Dashboard() {
         }
       })
       .catch((err) => console.warn("Could not fetch dashboard summary:", err));
+
+    modelApi
+      .status()
+      .then((status) => setModelStatus(status))
+      .catch((err) => console.warn("Could not fetch model status:", err));
 
     const handleFallEvent = (e: Event) => {
       const customEvent = e as CustomEvent<Incident>;
@@ -201,6 +214,7 @@ function Dashboard() {
                       location={camera.location}
                       url={camera.url}
                       protocol={camera.protocol}
+                      status={camera.status}
                     />
                     {!isOffline && (camera.protocol === "HTTP" || camera.protocol === "DEVICE") && (
                       <div className="camera-live-only absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground">
@@ -304,8 +318,22 @@ function Dashboard() {
                 terdeteksi minggu ini
               </p>
             </div>
-            <Badge variant="secondary" className="rounded-full">
-              Mode CCTV aktif
+            <Badge
+              variant="secondary"
+              title={modelStatus?.message || modelStatus?.model_file}
+              className={`rounded-full ${
+                modelStatus
+                  ? modelStatus.is_model_loaded
+                    ? "bg-success/15 text-success"
+                    : "bg-destructive/15 text-destructive"
+                  : ""
+              }`}
+            >
+              {modelStatus
+                ? modelStatus.is_model_loaded
+                  ? `Model AI Aktif${modelStatus.mode ? ` · ${modelStatus.mode}` : ""}`
+                  : "Model AI Tidak Aktif"
+                : "Mode CCTV aktif"}
             </Badge>
           </div>
           <div className="mt-6 flex h-36 items-end gap-1 sm:gap-3">
